@@ -1,10 +1,10 @@
 # Weight Pace Calculator
 
+A web application built with Next.js and shadcn/ui to estimate potential running pace improvements based on projected weight loss. Enter your current stats and threshold pace to see how your race times might change as you approach a target weight.
+
 **Live App:** [https://eikekarbe.com/weight-pace-calculator](https://eikekarbe.com/weight-pace-calculator)
 
 ![Weight-Pace-Calculator Screenshot](https://raw.githubusercontent.com/ekarbe/weight-pace-calculator/refs/heads/main/assets/APP.PNG)
-
-A web application built with Next.js and shadcn/ui to estimate potential running pace improvements based on projected weight loss. Enter your current stats and threshold pace to see how your race times might change as you approach a target weight.
 
 ## ✨ Features
 
