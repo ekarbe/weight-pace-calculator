@@ -123,7 +123,7 @@ export default function HomePage() {
                       <SelectItem value="female">Female</SelectItem>
                     </SelectContent>
                   </Select>
-                  {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender}</p>}
+                  {errors.gender && <p className="text-destructive text-xs mt-1">{errors.gender}</p>}
                 </div>
 
                 <div>
@@ -138,7 +138,7 @@ export default function HomePage() {
                     step="0.1"
                     className={cn(errors.height && "border-destructive")}
                   />
-                  {errors.height && <p className="text-red-500 text-xs mt-1">{errors.height}</p>}
+                  {errors.height && <p className="text-destructive text-xs mt-1">{errors.height}</p>}
                 </div>
 
                 <div>
@@ -153,7 +153,7 @@ export default function HomePage() {
                     step="0.1"
                     className={cn(errors.weight && "border-destructive")}
                   />
-                  {errors.weight && <p className="text-red-500 text-xs mt-1">{errors.weight}</p>}
+                  {errors.weight && <p className="text-destructive text-xs mt-1">{errors.weight}</p>}
                 </div>
 
                 <div>
@@ -169,7 +169,7 @@ export default function HomePage() {
                     step="0.1"
                     className={cn(errors.bfp && "border-destructive")}
                   />
-                  {errors.bfp && <p className="text-red-500 text-xs mt-1">{errors.bfp}</p>}
+                  {errors.bfp && <p className="text-destructive text-xs mt-1">{errors.bfp}</p>}
                 </div>
 
                 <div>
@@ -208,7 +208,7 @@ export default function HomePage() {
                       aria-label="Threshold pace seconds"
                     />
                   </div>
-                  {errors.pace && <p className="text-red-500 text-xs mt-1">{errors.pace}</p>}
+                  {errors.pace && <p className="text-destructive text-xs mt-1">{errors.pace}</p>}
                 </div>
 
                 <Button
@@ -289,15 +289,15 @@ export default function HomePage() {
                 </Card>
 
                 {results.warnings && results.warnings.length > 0 && (
-                  <Card className="border-amber-500">
+                  <Card className="border-amber-500/50">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-amber-700">
+                      <CardTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                         <AlertTriangle className="w-5 h-5" /> Warnings & Disclaimers
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {results.warnings.map((warning, index) => (
-                        <Alert key={index} className="border border-amber-400 bg-amber-50 text-amber-800 [&>svg]:text-amber-600">
+                        <Alert key={index} className="border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400">
                           <AlertTriangle className="h-4 w-4" />
                           <AlertDescription>
                             {warning}
