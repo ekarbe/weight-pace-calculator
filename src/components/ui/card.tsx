@@ -3,7 +3,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+function Card({ className, interactive = false, ...props }: React.ComponentProps<"div"> & { interactive?: boolean }) {
   const cardRef = React.useRef<HTMLDivElement>(null)
   
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -28,14 +28,15 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       ref={cardRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
+      onMouseMove={interactive ? handleMouseMove : undefined}
+      onMouseLeave={interactive ? handleMouseLeave : undefined}
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground glassmorphism flex flex-col gap-6 rounded-[2rem] border border-border py-[2.5rem] shadow-[0_4px_24px_rgba(0,0,0,0.04)] transition-transform duration-100 ease-out",
+        "bg-card text-card-foreground glassmorphism flex flex-col gap-6 rounded-[2rem] border border-border py-[2.5rem] shadow-[0_4px_24px_rgba(0,0,0,0.04)]",
+        interactive && "transition-transform duration-100 ease-out cursor-pointer",
         className
       )}
-      style={{ transformStyle: 'preserve-3d' }}
+      style={interactive ? { transformStyle: 'preserve-3d' } : undefined}
       {...props}
     />
   )

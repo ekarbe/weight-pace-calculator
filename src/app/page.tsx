@@ -104,7 +104,7 @@ export default function HomePage() {
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-1">
-            <Card>
+            <Card interactive>
               <CardHeader>
                 <CardTitle>Input Data</CardTitle>
                 <CardDescription>
@@ -236,7 +236,7 @@ export default function HomePage() {
                   </Alert>
                 )}
 
-                <Card>
+                <Card interactive>
                   <CardHeader>
                     <CardTitle>Estimated Improvements</CardTitle>
                     <CardDescription>
