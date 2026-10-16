@@ -9,7 +9,7 @@ import { useI18n } from '@/i18n/provider';
 export function Header() {
   const { t } = useI18n();
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 glassmorphism">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 glassmorphism print:hidden">
       <div className="container flex h-16 max-w-screen-2xl items-center justify-between gap-2 px-4">
         <Link
           href="/"

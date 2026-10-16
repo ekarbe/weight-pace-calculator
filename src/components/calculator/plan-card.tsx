@@ -55,7 +55,7 @@ export function PlanCard({ startKg, targetKg, units, targetDate, onDate }: Props
           {rich('plan.sustainable', { amount: w(lostKg), unit: labels.weight, pct: SUSTAINABLE_PCT_PER_WEEK, weeks: plural('plan.weeks', Math.ceil(sustainable.weeks)), date: date(sustainable.date) })}
         </p>
       )}
-      <div className="mt-4 max-w-xs">
+      <div className="mt-4 max-w-xs print:hidden">
         <Label htmlFor={`${id}-date`}>{t('plan.label')}</Label>
         <Input id={`${id}-date`} type="date" min={tomorrow} value={targetDate} onChange={(e) => onDate(e.target.value)} aria-invalid={!!targetDate && !plan} aria-describedby={targetDate && !plan ? `${id}-err` : undefined} />
       </div>
