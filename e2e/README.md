@@ -35,10 +35,18 @@ already have instead of the one Playwright installs (local use only).
 | `share`, `share-image`, `print` | share link round trips, the PNG download and its privacy, print layout and PDF |
 | `a11y`, `a11y-states`, `keyboard`, `responsive` | axe scans (4 languages x light/dark x desktop/mobile and many states), keyboard-only walk, reflow at 320 and 390px |
 
+## Accessibility scans
+
+`support/axe.ts` runs axe with the WCAG 2.0/2.1 A and AA tags plus best practices. The soft page-background gradient is
+hidden for the duration of a scan: axe cannot compute the colour behind text that sits on a gradient and would
+report nearly all of it as "incomplete" instead of checking it. Open Radix popups (select lists) are scanned with the
+page-level rules that a modal popup breaks by design (landmarks, heading, hidden skip link) switched off.
+
 ## Known defects
 
 A few tests are annotated `test.fail(...)`: they assert the *fixed* behaviour of defects found while writing the suite
-(contrast of the "Too fast" label, flagged table rows and the threshold-pace tooltip, the first click of the theme
-toggle, a duplicate `<meta name="description">`, and the sticky header covering a focused control). They pass while
-the defect exists and start failing the run when it is fixed, which is the cue to delete the annotation (and, for the
-axe scans, the matching exclusion).
+(light-theme contrast of `text-destructive` text such as the "Too fast" label, flagged table rows, the warning box and
+the input panel's field errors; the contrast of the threshold-pace tooltip; the first click of the theme toggle; a
+duplicate `<meta name="description">`; the sticky header covering a focused control). They pass while the defect
+exists and start failing the run when it is fixed, which is the cue to delete the annotation (and, for the axe scans,
+the matching exclusion).

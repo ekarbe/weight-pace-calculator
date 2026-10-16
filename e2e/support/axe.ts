@@ -16,7 +16,23 @@ export interface AxeOptions {
   rules?: string[];
 }
 
+/**
+ * The page background is a soft radial gradient (`.mesh-background`). axe cannot work out the colour behind text that
+ * sits over a gradient, so it reports almost all of it as "incomplete" instead of checking it. Hiding the gradient for
+ * the duration of a scan makes the contrast check real; the gradient is only a faint tint of the same background.
+ */
+const FLAT_BACKGROUND = '.mesh-background { display: none !important; }';
+
 export async function axeViolations(page: Page, opts: AxeOptions = {}): Promise<string[]> {
+  const flat = await page.addStyleTag({ content: FLAT_BACKGROUND });
+  try {
+    return await scan(page, opts);
+  } finally {
+    await flat.evaluate((el) => (el as Element).remove());
+  }
+}
+
+async function scan(page: Page, opts: AxeOptions): Promise<string[]> {
   let builder = new AxeBuilder({ page }).withTags(AXE_TAGS);
   for (const selector of opts.include ?? []) builder = builder.include(selector);
   for (const selector of opts.exclude ?? []) builder = builder.exclude(selector);

@@ -1,17 +1,20 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/fixtures';
 import { MODAL_POPUP_RULES, expectNoAxeViolations } from './support/axe';
 import { DATE_BRISK, DATE_TOO_FAST, LOCALES, SAMPLE, brokenAriaReferences, disableMotion, fillSample, form, openAllDetails, openApp, slider, tr } from './support/app';
 
 /**
  * Known defects (reported with this suite, not fixed by it):
- *  - In the light theme `text-destructive` (#ff3b30) is about 3.5:1 on the card background, so the "Too fast" label of
- *    the timeline and the table rows below healthy body fat fail WCAG 1.4.3.
+ *  - In the light theme `text-destructive` (#ff3b30) is about 3.5:1 on the card background. It is used for the
+ *    "Too fast" label of the timeline, table rows below healthy body fat, the red warning box under the slider, the
+ *    field errors of the input panel and the "pick a date in the future" message, all of which fail WCAG 1.4.3.
+ *    (The race-result and training fields already use text-red-700 in the light theme, which passes.)
  *  - The "What is threshold pace?" tooltip paints grey paragraph text (the global `p` colour) on its green
  *    background in both themes, about 2.4:1.
- * The scans below leave those elements out; the `test.fail` tests at the bottom assert the fixed behaviour, so
- * they start failing the run once the defects are fixed, and the exclusions can go.
+ * The scans below leave the light-theme `.text-destructive` elements out; the `test.fail` tests at the bottom assert
+ * the fixed behaviour, so they start failing the run once the defects are fixed, and the exclusions can go.
  */
-const KNOWN_LIGHT_CONTRAST_DEFECTS = ['[role="status"] strong.text-destructive', 'tbody tr.text-destructive'];
+const KNOWN_LIGHT_CONTRAST_DEFECTS = ['.text-destructive'];
 
 const FULL = { ...SAMPLE, td: DATE_BRISK, wk: '40', th: 'some' };
 
@@ -34,7 +37,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await f.advanced.click();
       await f.paceGain.fill('9');
       await expect(page.getByRole('alert').filter({ hasText: 'Enter 50–272 cm' })).toBeVisible();
-      await expectNoAxeViolations(page);
+      await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
       expect(await brokenAriaReferences(page)).toEqual([]);
     });
 
@@ -71,7 +74,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.keyboard.press('End');
       await expect(page.getByText('Pace is capped at the model’s limit here')).toBeVisible();
       await openAllDetails(page);
-      await expectNoAxeViolations(page);
+      await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
     });
 
     test('open select lists', async ({ page }) => {
@@ -163,18 +166,31 @@ test.describe('known contrast defects in the light theme', () => {
   test.use({ colorScheme: 'light' });
   test.beforeEach(({ page }) => disableMotion(page));
 
+  const contrastOfDestructiveText = (page: Page) => expectNoAxeViolations(page, { include: ['.text-destructive'], rules: ['color-contrast'] });
+
   test('the "Too fast" risk label has enough contrast', async ({ page }) => {
     test.fail(true, 'timeline risk label uses text-destructive, about 3.5:1 on the light card');
     await openApp(page, { params: { ...SAMPLE, td: DATE_TOO_FAST }, results: true });
     await expect(page.getByText('Too fast').first()).toBeVisible();
-    await expectNoAxeViolations(page, { include: ['[role="status"] strong.text-destructive'], rules: ['color-contrast'] });
+    await contrastOfDestructiveText(page);
   });
 
-  test('table rows below healthy body fat have enough contrast', async ({ page }) => {
-    test.fail(true, 'flagged table rows use text-destructive, about 3.5:1 on the light card');
+  test('flagged table rows and the warning box under the slider have enough contrast', async ({ page }) => {
+    test.fail(true, 'flagged rows and the warning box use text-destructive, about 3.5:1 on the light card');
     await openApp(page, { params: { g: 'male', h: '180', w: '75', bf: '10', pm: '4', ps: '0' }, results: true });
+    await slider(page).focus();
+    await page.keyboard.press('End');
+    await expect(page.getByText('Estimated body fat at this weight is below healthy levels.')).toBeVisible();
     await openAllDetails(page);
-    await expectNoAxeViolations(page, { include: ['tbody tr.text-destructive'], rules: ['color-contrast'] });
+    await contrastOfDestructiveText(page);
+  });
+
+  test('the input panel\'s field errors have enough contrast', async ({ page }) => {
+    test.fail(true, 'field errors use text-destructive, about 3.5:1 on the light card');
+    await openApp(page);
+    await fillSample(page, { height: '20' });
+    await expect(page.getByRole('alert').filter({ hasText: 'Enter 50–272 cm' })).toBeVisible();
+    await contrastOfDestructiveText(page);
   });
 });
 

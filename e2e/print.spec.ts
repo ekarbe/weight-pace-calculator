@@ -141,7 +141,8 @@ test.describe('print', () => {
     await expect(footer(page)).toBeVisible();
     const { pages, text } = await pdfText(page);
     expect(pages).toBeGreaterThanOrEqual(1);
-    expect(pages).toBeLessThanOrEqual(3);
+    // The stylesheet aims for about three A4 pages; one page of slack keeps browser differences from failing the run.
+    expect(pages).toBeLessThanOrEqual(4);
     for (const expected of [
       'Weight Pace Calculator', 'YOUR STATS', 'TARGET WEIGHT', 'RACE TIME VS. WEIGHT', 'TIMELINE', 'TRAINING CONTEXT',
       'Notes & disclaimers', 'Disclaimer: These calculations are estimates', 'Printed on Jun 15, 2026',
