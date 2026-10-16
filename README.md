@@ -90,7 +90,9 @@ The model is a rule of thumb: each kg lost improves threshold pace by about 2 s/
 
 ## 📄 License
 
-See the [LICENSE](LICENSE.md) file for license rights and limitations (MIT).
+Copyright © 2025 Eike Christian Karbe.
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE) (`GPL-3.0-only`). You may use, modify and redistribute it, but derivative works must also be released under the GPL-3.0 with their source code.
 
 ---
 
