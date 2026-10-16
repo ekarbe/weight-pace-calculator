@@ -8,13 +8,14 @@ import { RaceCards } from '@/components/calculator/race-cards';
 import { ShareImageCard } from '@/components/calculator/share-image-card';
 import { PaceChart } from '@/components/calculator/pace-chart';
 import { PlanCard } from '@/components/calculator/plan-card';
+import { TrainingCard } from '@/components/calculator/training-card';
 import { ResultsTable } from '@/components/calculator/results-table';
 import { PrintButton, PrintFooter, PrintInputs } from '@/components/calculator/print';
 import { calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DEFAULT_TARGET_BMI_FLOOR } from '@/lib/calculations';
 import { calculateBand } from '@/lib/band';
 import { useI18n } from '@/i18n/provider';
 import type { MessageKey } from '@/i18n/messages/en';
-import { buildInput, type AdvancedState } from '@/lib/form';
+import { buildInput, buildTraining, type AdvancedState } from '@/lib/form';
 import { convertRaceDistance } from '@/lib/race-result';
 import { decodeForm, emptyForm, encodeForm, type FormState } from '@/lib/share';
 import { KM_PER_MILE, cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm, type UnitSystem } from '@/lib/units';
@@ -44,6 +45,7 @@ export default function HomePage() {
   }, []);
 
   const built = useMemo(() => buildInput(form, adv), [form, adv]);
+  const training = useMemo(() => buildTraining(form), [form]);
   const results = useMemo(() => (built.input ? calculateWeightPaceEstimates(built.input) : null), [built.input]);
   const rows = useMemo(() => results?.resultsTable ?? [], [results]);
   const band = useMemo(() => (built.input ? calculateBand(built.input) : null), [built.input]);
@@ -87,6 +89,7 @@ export default function HomePage() {
         paceSec,
         distance: convert(f.distance, toImp ? (n) => n / KM_PER_MILE : (n) => n * KM_PER_MILE),
         raceCustom: convertRaceDistance(f.raceCustom, toImp),
+        weeklyKm: convert(f.weeklyKm, toImp ? (n) => n / KM_PER_MILE : (n) => n * KM_PER_MILE),
       };
     });
     setSliderIndex(null);
@@ -131,6 +134,7 @@ export default function HomePage() {
                 <ShareImageCard rows={rows} index={index} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} />
                 <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
                 <PlanCard startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} units={form.units} targetDate={form.targetDate} onDate={(d) => setForm((f) => ({ ...f, targetDate: d }))} />
+                {built.input && <TrainingCard input={built.input} row={rows[index]} units={form.units} targetDate={form.targetDate} weeklyKmText={form.weeklyKm} history={form.trainingHistory} fields={training} onChange={(p) => setForm((f) => ({ ...f, ...p }))} />}
                 <ResultsTable rows={rows} warnings={results.warnings} units={form.units} enteredWeight={form.weight} selected={index} />
                 <PrintButton />
               </>
