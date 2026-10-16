@@ -1,16 +1,19 @@
 import type { UserInput } from './calculations';
 import type { FormState } from './share';
-import { inToCm, lbToKg, secPerMileToSecPerKm } from './units';
+import { MAX_CUSTOM_DISTANCE_KM, MIN_CUSTOM_DISTANCE_KM } from './calculations';
+import { KM_PER_MILE, inToCm, lbToKg, secPerMileToSecPerKm } from './units';
 
 export interface AdvancedState {
     paceFactor: string;
     bmiFloor: string;
 }
 
-export type FieldErrors = Partial<Record<'gender' | 'height' | 'weight' | 'bodyFat' | 'pace' | 'advanced', string>>;
+export type FieldErrors = Partial<Record<'gender' | 'height' | 'weight' | 'bodyFat' | 'pace' | 'advanced' | 'distance', string>>;
 
 export interface BuiltInput {
     input: UserInput | null;
+    /** Valid custom race distance in km, or null. Independent of `input`. */
+    customDistanceKm: number | null;
     errors: FieldErrors;
     /** Fields that are empty (not yet an error, just incomplete). */
     missing: string[];
@@ -52,13 +55,21 @@ export function buildInput(form: FormState, adv: AdvancedState): BuiltInput {
         perKm = Math.round(metric ? total : secPerMileToSecPerKm(total));
     }
 
+    let customDistanceKm: number | null = null;
+    if (!blank(form.distance)) {
+        const d = parseFloat(form.distance);
+        const km = metric ? d : d * KM_PER_MILE;
+        if (km >= MIN_CUSTOM_DISTANCE_KM && km <= MAX_CUSTOM_DISTANCE_KM) customDistanceKm = km;
+        else errors.distance = metric ? 'Enter 1–100 km' : 'Enter 0.6–62 mi';
+    }
+
     const factor = parseFloat(adv.paceFactor);
     const floor = parseFloat(adv.bmiFloor);
     if (isNaN(factor) || factor < 0 || factor > 5) errors.advanced = 'Pace gain must be 0–5 s/km per kg';
     else if (isNaN(floor) || floor < 18.5 || floor > 30) errors.advanced = 'BMI floor must be 18.5–30';
 
     if (missing.length || Object.keys(errors).length || !form.gender) {
-        return { input: null, errors, missing };
+        return { input: null, customDistanceKm, errors, missing };
     }
     return {
         input: {
@@ -71,6 +82,7 @@ export function buildInput(form: FormState, adv: AdvancedState): BuiltInput {
             paceFactorSecPerKg: factor,
             bmiFloor: floor,
         },
+        customDistanceKm,
         errors,
         missing,
     };

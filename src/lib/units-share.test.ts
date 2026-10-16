@@ -16,8 +16,11 @@ describe('units', () => {
 
 describe('share', () => {
     it('round-trips form state', () => {
-        const f = { ...emptyForm, gender: 'female' as const, height: '170', weight: '60.5', paceMin: '4', paceSec: '5', units: 'imperial' as const };
+        const f = { ...emptyForm, gender: 'female' as const, height: '170', weight: '60.5', paceMin: '4', paceSec: '5', units: 'imperial' as const, distance: '15', targetDate: '2026-09-01' };
         expect(decodeForm(encodeForm(f))).toEqual(f);
+    });
+    it('rejects a malformed date', () => {
+        expect(decodeForm('td=2026-9-1&h=180').targetDate).toBe('');
     });
     it('rejects garbage', () => {
         const f = decodeForm('h=<script>&g=alien&w=abc&u=x');

@@ -1,7 +1,10 @@
 {
   "name": "weight-pace-calculator",
   "version": "1.0.0",
-  "engines": { "node": ">=22" },
+  "license": "GPL-3.0-only",
+  "engines": {
+    "node": ">=22"
+  },
   "private": true,
   "scripts": {
     "dev": "next dev",

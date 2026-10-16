@@ -58,6 +58,35 @@ export function calculateMinHealthyWeight(heightCm: number, bmi: number = MIN_HE
     return bmi * (heightM * heightM);
 }
 
+const ANCHORS: [number, number][] = [
+    [5, 0.95],
+    [10, 0.98],
+    [21.0975, 1.04],
+    [42.195, 1.10],
+];
+export const MIN_CUSTOM_DISTANCE_KM = 1;
+export const MAX_CUSTOM_DISTANCE_KM = 100;
+
+/** Race pace as a fraction of threshold pace, interpolated on log(distance) between the 5K/10K/HM/M anchors. */
+export function racePaceFactor(distanceKm: number): number {
+    const d = Math.min(Math.max(distanceKm, MIN_CUSTOM_DISTANCE_KM), MAX_CUSTOM_DISTANCE_KM);
+    const x = Math.log(d);
+    let lo = ANCHORS[0];
+    let hi = ANCHORS[1];
+    for (let i = 0; i < ANCHORS.length - 1; i++) {
+        lo = ANCHORS[i];
+        hi = ANCHORS[i + 1];
+        if (x <= Math.log(hi[0])) break;
+    }
+    const t = (x - Math.log(lo[0])) / (Math.log(hi[0]) - Math.log(lo[0]));
+    return Math.min(Math.max(lo[1] + t * (hi[1] - lo[1]), 0.85), 1.25);
+}
+
+/** Estimated finishing time in seconds for any distance, given threshold pace in s/km. */
+export function estimateRaceTimeSec(thresholdPaceSecPerKm: number, distanceKm: number): number {
+    return Math.max(1, thresholdPaceSecPerKm) * racePaceFactor(distanceKm) * distanceKm;
+}
+
 function estimateRacePaceFromThreshold(thresholdPaceSecPerKm: number): { [key: string]: number } {
     const safeThresholdPace = Math.max(1, thresholdPaceSecPerKm);
     return {

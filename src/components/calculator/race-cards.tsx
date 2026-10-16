@@ -2,8 +2,8 @@
 
 import { useId } from 'react';
 import { AlertTriangle, HeartPulse } from 'lucide-react';
-import { cn, formatDelta, formatPace } from '@/lib/utils';
-import type { ResultRow } from '@/lib/calculations';
+import { cn, formatDelta, formatPace, formatTime } from '@/lib/utils';
+import { estimateRaceTimeSec, type ResultRow } from '@/lib/calculations';
 import { kgToLb, secPerKmToSecPerMile, unitLabels, type UnitSystem } from '@/lib/units';
 
 interface Props {
@@ -13,6 +13,8 @@ interface Props {
   units: UnitSystem;
   /** Weight the user typed, shown exactly for row 0. */
   enteredWeight: string;
+  customKm: number | null;
+  customLabel: string;
 }
 
 const RACES = [
@@ -22,7 +24,7 @@ const RACES = [
   { key: 'M', time: (r: ResultRow) => r.estimatedMTimeSec, text: (r: ResultRow) => r.estimatedMTimeFormatted, long: 'Marathon' },
 ] as const;
 
-export function RaceCards({ rows, index, onIndex, units, enteredWeight }: Props) {
+export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm, customLabel }: Props) {
   const sliderId = useId();
   const labels = unitLabels(units);
   const base = rows[0];
@@ -45,7 +47,7 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight }: Props)
         <p className="mt-1 text-sm">
           {index === 0
             ? 'Drag the slider to see what a lighter you could run.'
-            : <>−{lost.toFixed(1)} {labels.weight} · threshold pace <strong className="text-foreground">{paceText}</strong> /{units === 'metric' ? 'km' : 'mi'}{tenKSaved > 0 && <> · 10K <strong className="text-primary">{formatDelta(tenKSaved)} faster</strong></>}</>}
+            : <>−{lost.toFixed(1)} {labels.weight} · threshold pace <strong className="text-foreground">{paceText}</strong> /{units === 'metric' ? 'km' : 'mi'}{tenKSaved > 0 && <> · 10K <strong className="text-primary-ink">{formatDelta(tenKSaved)} faster</strong></>}</>}
         </p>
         <label htmlFor={sliderId} className="sr-only">Target weight</label>
         <input
@@ -85,16 +87,32 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight }: Props)
               <span className="inline-block rounded-md bg-foreground px-2 py-0.5 text-lg font-black tracking-tight text-background">{race.key}</span>
               <span className="mt-1 block text-[10px] uppercase tracking-wider text-muted-foreground">{race.long}</span>
               <p className="mt-2 text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-foreground">{race.text(sel)}</p>
-              <p className={cn('mt-1 text-sm font-semibold tabular-nums', saved > 0.5 ? 'text-primary' : 'text-muted-foreground')}>
+              <p className={cn('mt-1 text-sm font-semibold tabular-nums', saved > 0.5 ? 'text-primary-ink' : 'text-muted-foreground')}>
                 {saved > 0.5 ? `−${formatDelta(saved)}` : 'baseline'}
               </p>
               <div aria-hidden className="absolute inset-x-0 bottom-0 h-1.5 bg-[repeating-linear-gradient(90deg,var(--foreground)_0_8px,transparent_8px_16px)] opacity-70" />
             </li>
           );
         })}
+        {customKm !== null && (() => {
+          const now = estimateRaceTimeSec(base.estimatedThresholdPaceSec ?? 0, customKm);
+          const then = estimateRaceTimeSec(sel.estimatedThresholdPaceSec ?? 0, customKm);
+          const saved = now - then;
+          return (
+            <li className="relative col-span-2 overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4 lg:col-span-4">
+              <span className="inline-block rounded-md bg-primary px-2 py-0.5 text-lg font-black tracking-tight text-primary-foreground">{customLabel}</span>
+              <span className="mt-1 block text-[10px] uppercase tracking-wider text-muted-foreground">Your distance</span>
+              <p className="mt-2 text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-foreground">{formatTime(then)}</p>
+              <p className={cn('mt-1 text-sm font-semibold tabular-nums', saved > 0.5 ? 'text-primary-ink' : 'text-muted-foreground')}>
+                {saved > 0.5 ? `−${formatDelta(saved)}` : 'baseline'}
+              </p>
+              <div aria-hidden className="absolute inset-x-0 bottom-0 h-1.5 bg-[repeating-linear-gradient(90deg,var(--foreground)_0_8px,transparent_8px_16px)] opacity-70" />
+            </li>
+          );
+        })()}
       </ul>
 
-      <p className="flex gap-2 text-xs"><HeartPulse className="h-4 w-4 shrink-0 text-primary" />
+      <p className="flex gap-2 text-xs"><HeartPulse className="h-4 w-4 shrink-0 text-primary-ink" />
         Estimates, not a weight-loss plan. Don’t aim below a healthy weight for your height; talk to a doctor or dietitian before changing your weight.
       </p>
     </section>
