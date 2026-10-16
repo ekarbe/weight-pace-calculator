@@ -12,6 +12,7 @@ import { calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DE
 import { useI18n } from '@/i18n/provider';
 import type { MessageKey } from '@/i18n/messages/en';
 import { buildInput, type AdvancedState } from '@/lib/form';
+import { convertRaceDistance } from '@/lib/race-result';
 import { decodeForm, emptyForm, encodeForm, type FormState } from '@/lib/share';
 import { KM_PER_MILE, cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm, type UnitSystem } from '@/lib/units';
 
@@ -81,6 +82,7 @@ export default function HomePage() {
         paceMin,
         paceSec,
         distance: convert(f.distance, toImp ? (n) => n / KM_PER_MILE : (n) => n * KM_PER_MILE),
+        raceCustom: convertRaceDistance(f.raceCustom, toImp),
       };
     });
     setSliderIndex(null);
