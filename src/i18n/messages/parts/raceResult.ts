@@ -3,11 +3,99 @@
  * languages are typed against it, so a missing or extra key fails the build.
  * Keep keys namespaced (e.g. 'raceResult.something').
  */
-const en = {} as const;
+const en = {
+  'raceResult.source.group': 'Threshold pace source',
+  'raceResult.source.threshold': 'Threshold pace',
+  'raceResult.source.race': 'From a recent race',
+  'raceResult.legend': 'Threshold pace from a recent race',
+  'raceResult.hint': 'Use a recent race you ran flat out. We work backwards from it with the same model that estimates your race times, so treat the result as a rough guide.',
+  'raceResult.distance.label': 'Race distance',
+  'raceResult.distance.custom': 'Other distance',
+  'raceResult.distance.customLabel': 'Distance you ran ({unit})',
+  'raceResult.time.legend': 'Finishing time',
+  'raceResult.time.hours': 'Hours',
+  'raceResult.time.minutes': 'Minutes',
+  'raceResult.time.seconds': 'Seconds',
+  'raceResult.derived': 'Estimated threshold pace: <b>{pace}</b> /{unit}',
+  'raceResult.derived.sr': 'Estimated threshold pace: {pace} per {unitName}',
+  'raceResult.unitName.metric': 'kilometer',
+  'raceResult.unitName.imperial': 'mile',
+  'raceResult.err.time': 'Enter a valid time: whole numbers, seconds 0–59, and minutes 0–59 once hours are entered.',
+  'raceResult.err.pace.metric': 'That time works out to a threshold pace outside 2:00–12:00 per km. Please check the time and distance.',
+  'raceResult.err.pace.imperial': 'That time works out to a threshold pace outside 3:13–19:19 per mile. Please check the time and distance.',
+  'missing.raceDistance': 'race distance',
+  'missing.raceTime': 'race time',
+} as const;
 type Keys = keyof typeof en;
 
-const de: Record<Keys, string> = {};
-const es: Record<Keys, string> = {};
-const fr: Record<Keys, string> = {};
+const de: Record<Keys, string> = {
+  'raceResult.source.group': 'Quelle des Schwellentempos',
+  'raceResult.source.threshold': 'Schwellentempo',
+  'raceResult.source.race': 'Aus Wettkampfergebnis',
+  'raceResult.legend': 'Schwellentempo aus Wettkampfergebnis',
+  'raceResult.hint': 'Nimm einen aktuellen Wettkampf, bei dem du alles gegeben hast. Wir rechnen mit demselben Modell rückwärts, das auch deine Wettkampfzeiten schätzt – das Ergebnis ist daher nur ein grober Richtwert.',
+  'raceResult.distance.label': 'Wettkampfdistanz',
+  'raceResult.distance.custom': 'Andere Distanz',
+  'raceResult.distance.customLabel': 'Gelaufene Distanz ({unit})',
+  'raceResult.time.legend': 'Zielzeit',
+  'raceResult.time.hours': 'Stunden',
+  'raceResult.time.minutes': 'Minuten',
+  'raceResult.time.seconds': 'Sekunden',
+  'raceResult.derived': 'Geschätztes Schwellentempo: <b>{pace}</b> /{unit}',
+  'raceResult.derived.sr': 'Geschätztes Schwellentempo: {pace} pro {unitName}',
+  'raceResult.unitName.metric': 'Kilometer',
+  'raceResult.unitName.imperial': 'Meile',
+  'raceResult.err.time': 'Gib eine gültige Zeit ein: ganze Zahlen, Sekunden 0–59 und Minuten 0–59, sobald Stunden angegeben sind.',
+  'raceResult.err.pace.metric': 'Diese Zeit ergibt ein Schwellentempo außerhalb von 2:00–12:00 pro km. Prüfe bitte Zeit und Distanz.',
+  'raceResult.err.pace.imperial': 'Diese Zeit ergibt ein Schwellentempo außerhalb von 3:13–19:19 pro Meile. Prüfe bitte Zeit und Distanz.',
+  'missing.raceDistance': 'Wettkampfdistanz',
+  'missing.raceTime': 'Wettkampfzeit',
+};
+const es: Record<Keys, string> = {
+  'raceResult.source.group': 'Origen del ritmo umbral',
+  'raceResult.source.threshold': 'Ritmo umbral',
+  'raceResult.source.race': 'Desde una carrera reciente',
+  'raceResult.legend': 'Ritmo umbral a partir de una carrera reciente',
+  'raceResult.hint': 'Usa una carrera reciente en la que diste el máximo. Calculamos hacia atrás con el mismo modelo que estima tus tiempos de carrera, así que toma el resultado como una guía aproximada.',
+  'raceResult.distance.label': 'Distancia de la carrera',
+  'raceResult.distance.custom': 'Otra distancia',
+  'raceResult.distance.customLabel': 'Distancia que corriste ({unit})',
+  'raceResult.time.legend': 'Tiempo final',
+  'raceResult.time.hours': 'Horas',
+  'raceResult.time.minutes': 'Minutos',
+  'raceResult.time.seconds': 'Segundos',
+  'raceResult.derived': 'Ritmo umbral estimado: <b>{pace}</b> /{unit}',
+  'raceResult.derived.sr': 'Ritmo umbral estimado: {pace} por {unitName}',
+  'raceResult.unitName.metric': 'kilómetro',
+  'raceResult.unitName.imperial': 'milla',
+  'raceResult.err.time': 'Introduce un tiempo válido: números enteros, segundos de 0 a 59 y minutos de 0 a 59 si indicas horas.',
+  'raceResult.err.pace.metric': 'Ese tiempo da un ritmo umbral fuera del rango 2:00–12:00 por km. Revisa el tiempo y la distancia.',
+  'raceResult.err.pace.imperial': 'Ese tiempo da un ritmo umbral fuera del rango 3:13–19:19 por milla. Revisa el tiempo y la distancia.',
+  'missing.raceDistance': 'distancia de la carrera',
+  'missing.raceTime': 'tiempo de carrera',
+};
+const fr: Record<Keys, string> = {
+  'raceResult.source.group': 'Origine de l’allure seuil',
+  'raceResult.source.threshold': 'Allure seuil',
+  'raceResult.source.race': 'D’après une course récente',
+  'raceResult.legend': 'Allure seuil d’après une course récente',
+  'raceResult.hint': 'Utilisez une course récente courue à fond. Nous remontons à l’allure seuil avec le même modèle que celui qui estime vos temps de course : considérez le résultat comme un ordre de grandeur.',
+  'raceResult.distance.label': 'Distance de la course',
+  'raceResult.distance.custom': 'Autre distance',
+  'raceResult.distance.customLabel': 'Distance courue ({unit})',
+  'raceResult.time.legend': 'Temps réalisé',
+  'raceResult.time.hours': 'Heures',
+  'raceResult.time.minutes': 'Minutes',
+  'raceResult.time.seconds': 'Secondes',
+  'raceResult.derived': 'Allure seuil estimée : <b>{pace}</b> /{unit}',
+  'raceResult.derived.sr': 'Allure seuil estimée : {pace} par {unitName}',
+  'raceResult.unitName.metric': 'kilomètre',
+  'raceResult.unitName.imperial': 'mile',
+  'raceResult.err.time': 'Saisissez un temps valide : nombres entiers, secondes de 0 à 59 et minutes de 0 à 59 dès que des heures sont indiquées.',
+  'raceResult.err.pace.metric': 'Ce temps donne une allure seuil hors de la plage 2:00–12:00 par km. Vérifiez le temps et la distance.',
+  'raceResult.err.pace.imperial': 'Ce temps donne une allure seuil hors de la plage 3:13–19:19 par mile. Vérifiez le temps et la distance.',
+  'missing.raceDistance': 'distance de la course',
+  'missing.raceTime': 'temps de course',
+};
 
 export const raceResult = { en, de, es, fr };
