@@ -2,6 +2,7 @@ import type { UserInput } from './calculations';
 import type { FormState } from './share';
 import { MAX_CUSTOM_DISTANCE_KM, MIN_CUSTOM_DISTANCE_KM } from './calculations';
 import { KM_PER_MILE, inToCm, lbToKg, secPerMileToSecPerKm } from './units';
+import { deriveRacePace, type RaceErrorKey } from './race-result';
 
 export interface AdvancedState {
     paceFactor: string;
@@ -9,12 +10,13 @@ export interface AdvancedState {
 }
 
 /** Values are message keys (see src/i18n/messages), not display text. */
-export type FieldErrors = Partial<Record<'gender' | 'height' | 'weight' | 'bodyFat' | 'pace' | 'advanced' | 'distance', ErrorKey>>;
+export type FieldErrors = Partial<Record<'gender' | 'height' | 'weight' | 'bodyFat' | 'pace' | 'advanced' | 'distance' | 'raceDistance' | 'raceTime', ErrorKey>>;
 
 export type ErrorKey =
     | 'err.height.metric' | 'err.height.imperial' | 'err.weight.metric' | 'err.weight.imperial'
     | 'err.bodyFat' | 'err.pace' | 'err.paceFactor' | 'err.bmiFloor'
-    | 'err.distance.metric' | 'err.distance.imperial';
+    | 'err.distance.metric' | 'err.distance.imperial'
+    | RaceErrorKey;
 
 export interface BuiltInput {
     input: UserInput | null;
@@ -54,7 +56,12 @@ export function buildInput(form: FormState, adv: AdvancedState): BuiltInput {
     const pm = parseInt(form.paceMin, 10);
     const ps = parseInt(form.paceSec, 10);
     let perKm = NaN;
-    if (blank(form.paceMin) || blank(form.paceSec)) missing.push('pace');
+    if (form.paceSource === 'race') {
+        const race = deriveRacePace(form);
+        perKm = race.perKm ?? NaN;
+        missing.push(...race.missing);
+        Object.assign(errors, race.errors);
+    } else if (blank(form.paceMin) || blank(form.paceSec)) missing.push('pace');
     else if (isNaN(pm) || isNaN(ps) || pm < 0 || ps < 0 || ps >= 60 || pm * 60 + ps === 0) errors.pace = 'err.pace';
     else {
         const total = pm * 60 + ps;

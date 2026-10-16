@@ -9,7 +9,7 @@ const MIN_PACE_SEC_MALE = 2 * 60 + 40;
 const MIN_PACE_SEC_FEMALE = 3 * 60 + 0;
 
 
-const RACE_DISTANCES = {
+export const RACE_DISTANCES = {
     '5k': 5,
     '10k': 10,
     'hm': 21.0975,
@@ -96,6 +96,17 @@ export function racePaceFactor(distanceKm: number): number {
 /** Estimated finishing time in seconds for any distance, given threshold pace in s/km. */
 export function estimateRaceTimeSec(thresholdPaceSecPerKm: number, distanceKm: number): number {
     return Math.max(1, thresholdPaceSecPerKm) * racePaceFactor(distanceKm) * distanceKm;
+}
+
+/**
+ * Inverse of `estimateRaceTimeSec`: the threshold pace (s/km) implied by a race result.
+ * Throws a RangeError for a non-positive or non-finite time or distance.
+ */
+export function thresholdPaceFromRace(timeSec: number, distanceKm: number): number {
+    if (!Number.isFinite(timeSec) || !Number.isFinite(distanceKm) || timeSec <= 0 || distanceKm <= 0) {
+        throw new RangeError('Race time and distance must be positive numbers.');
+    }
+    return timeSec / distanceKm / racePaceFactor(distanceKm);
 }
 
 function estimateRacePaceFromThreshold(thresholdPaceSecPerKm: number): { [key: string]: number } {

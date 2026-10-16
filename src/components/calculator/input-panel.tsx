@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { RaceResultInput } from '@/components/calculator/race-result-input';
 import { cn } from '@/lib/utils';
 import type { FormState } from '@/lib/share';
 import type { AdvancedState, FieldErrors } from '@/lib/form';
@@ -84,7 +85,9 @@ export function InputPanel({ form, adv, errors, copied, onChange, onUnits, onAdv
         <FieldError id="bfp-err" message={errors.bodyFat} />
       </div>
 
-      <fieldset aria-describedby={describedBy('pace-err', errors.pace)}>
+      <RaceResultInput form={form} errors={errors} onChange={onChange} />
+
+      <fieldset hidden={form.paceSource === 'race'} aria-describedby={describedBy('pace-err', errors.pace)}>
         <legend className="mb-1 flex items-center gap-1 text-sm font-medium leading-none">
           {t('pace.label', { unit: labels.pace })}
           <TooltipProvider>
