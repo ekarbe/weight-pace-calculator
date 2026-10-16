@@ -5,11 +5,13 @@ import { Header } from '@/components/ui/header';
 import { Footer } from '@/components/ui/footer';
 import { InputPanel } from '@/components/calculator/input-panel';
 import { RaceCards } from '@/components/calculator/race-cards';
+import { PaceChart } from '@/components/calculator/pace-chart';
+import { PlanCard } from '@/components/calculator/plan-card';
 import { ResultsTable } from '@/components/calculator/results-table';
 import { calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DEFAULT_TARGET_BMI_FLOOR } from '@/lib/calculations';
 import { buildInput, type AdvancedState } from '@/lib/form';
 import { decodeForm, emptyForm, encodeForm, type FormState } from '@/lib/share';
-import { cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm, type UnitSystem } from '@/lib/units';
+import { KM_PER_MILE, cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm, type UnitSystem } from '@/lib/units';
 
 const round1 = (n: number) => String(Math.round(n * 10) / 10);
 const convert = (v: string, fn: (n: number) => number) => {
@@ -75,6 +77,7 @@ export default function HomePage() {
         weight: convert(f.weight, toImp ? kgToLb : lbToKg),
         paceMin,
         paceSec,
+        distance: convert(f.distance, toImp ? (n) => n / KM_PER_MILE : (n) => n * KM_PER_MILE),
       };
     });
     setSliderIndex(null);
@@ -93,6 +96,7 @@ export default function HomePage() {
     }
   };
 
+  const customLabel = form.distance ? `${parseFloat(form.distance)} ${form.units === 'metric' ? 'km' : 'mi'}` : '';
   const missingLabels: Record<string, string> = { gender: 'sex', height: 'height', weight: 'weight', pace: 'threshold pace' };
 
   return (
@@ -112,7 +116,9 @@ export default function HomePage() {
           <div className="min-w-0 space-y-6">
             {results && rows.length > 0 ? (
               <>
-                <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} />
+                <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} />
+                <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} />
+                <PlanCard startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} units={form.units} targetDate={form.targetDate} onDate={(d) => setForm((f) => ({ ...f, targetDate: d }))} />
                 <ResultsTable rows={rows} warnings={results.warnings} units={form.units} enteredWeight={form.weight} selected={index} />
               </>
             ) : (

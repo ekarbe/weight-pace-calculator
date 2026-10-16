@@ -8,14 +8,18 @@ export interface FormState {
     bodyFat: string;
     paceMin: string;
     paceSec: string;
+    /** Optional custom race distance, in the selected units (km or miles). */
+    distance: string;
+    /** Optional target date, YYYY-MM-DD. */
+    targetDate: string;
 }
 
 export const emptyForm: FormState = {
-    units: 'metric', gender: '', height: '', weight: '', bodyFat: '', paceMin: '', paceSec: '',
+    units: 'metric', gender: '', height: '', weight: '', bodyFat: '', paceMin: '', paceSec: '', distance: '', targetDate: '',
 };
 
 const KEYS: Record<keyof FormState, string> = {
-    units: 'u', gender: 'g', height: 'h', weight: 'w', bodyFat: 'bf', paceMin: 'pm', paceSec: 'ps',
+    units: 'u', gender: 'g', height: 'h', weight: 'w', bodyFat: 'bf', paceMin: 'pm', paceSec: 'ps', distance: 'd', targetDate: 'td',
 };
 
 export function encodeForm(f: FormState): string {
@@ -37,5 +41,7 @@ export function decodeForm(query: string): FormState {
         units: p.get('u') === 'imperial' ? 'imperial' : 'metric',
         gender: g === 'male' || g === 'female' ? g : '',
         height: num('h'), weight: num('w'), bodyFat: num('bf'), paceMin: num('pm'), paceSec: num('ps'),
+        distance: num('d'),
+        targetDate: /^\d{4}-\d{2}-\d{2}$/.test(p.get('td') ?? '') ? p.get('td')! : '',
     };
 }

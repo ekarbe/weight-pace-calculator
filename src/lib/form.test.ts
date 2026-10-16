@@ -31,4 +31,10 @@ describe('buildInput', () => {
         expect(buildInput(ok, { paceFactor: '9', bmiFloor: '20' }).errors.advanced).toBeTruthy();
         expect(buildInput(ok, { paceFactor: '2', bmiFloor: '15' }).input).toBeNull();
     });
+    it('validates the optional custom distance in the selected units', () => {
+        expect(buildInput({ ...ok, distance: '15' }, adv).customDistanceKm).toBe(15);
+        expect(buildInput({ ...ok, units: 'imperial', height: '71', weight: '176', paceMin: '7', paceSec: '0', distance: '10' }, adv).customDistanceKm).toBeCloseTo(16.09, 2);
+        expect(buildInput({ ...ok, distance: '500' }, adv).errors.distance).toBeTruthy();
+        expect(buildInput({ ...ok, distance: '' }, adv).customDistanceKm).toBeNull();
+    });
 });

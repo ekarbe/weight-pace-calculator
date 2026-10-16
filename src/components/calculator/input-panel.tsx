@@ -99,6 +99,13 @@ export function InputPanel({ form, adv, errors, copied, onChange, onUnits, onAdv
         <FieldError id="pace-err" message={errors.pace} />
       </div>
 
+      <div>
+        <Label htmlFor="distance">Custom race distance ({metric ? 'km' : 'mi'}) <span className="text-muted-foreground text-xs">(optional)</span></Label>
+        <Input id="distance" type="number" inputMode="decimal" min="0" step="0.1" placeholder={metric ? '15' : '9.3'} value={form.distance}
+          onChange={(e) => onChange({ distance: e.target.value })} aria-invalid={!!errors.distance} aria-describedby="distance-err" className={invalid(errors.distance)} />
+        <FieldError id="distance-err" message={errors.distance} />
+      </div>
+
       <details className="rounded-2xl border p-3 text-sm">
         <summary className="cursor-pointer font-medium">Advanced assumptions</summary>
         <div className="mt-3 space-y-3">

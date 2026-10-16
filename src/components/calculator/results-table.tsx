@@ -49,10 +49,10 @@ export function ResultsTable({ rows, warnings, units, enteredWeight, selected }:
 
       {warnings.length > 0 && (
         <details className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
-          <summary className="flex cursor-pointer items-center gap-2 font-semibold text-amber-700 dark:text-amber-400">
+          <summary className="flex cursor-pointer items-center gap-2 font-semibold text-amber-800 dark:text-amber-400">
             <AlertTriangle className="h-4 w-4" /> Notes & disclaimers ({warnings.length})
           </summary>
-          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-amber-800 dark:text-amber-300">
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-amber-900 dark:text-amber-300">
             {warnings.map((m, i) => <li key={i}>{m}</li>)}
           </ul>
         </details>
