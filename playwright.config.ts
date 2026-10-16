@@ -11,7 +11,12 @@ import { defineConfig, devices } from '@playwright/test';
  *   E2E_REUSE_BUILD=1     do not run `npm run build` first (otherwise every run tests a fresh build)
  *   PW_CHROMIUM_EXECUTABLE  local escape hatch: path to a Chromium / headless_shell binary to drive instead of the
  *                           one Playwright downloads. Needed only on machines where `playwright install` is not
- *                           possible and an older Chromium is preinstalled. Never set in CI.
+ *                           possible and another Chromium is preinstalled. Never set in CI, which installs the
+ *                           browser that matches the Playwright version (see .github/workflows/ci.yml).
+ *
+ * Playwright version: the latest (1.64) is used. It drove an older preinstalled Chromium (141, the build Playwright
+ * 1.56 ships) through the whole suite (clock, clipboard, downloads, PDF, touch, emulated media) without problems,
+ * so there is no reason to pin an older release.
  *
  * Everything that could make a run non-deterministic is pinned: locale, time zone, colour scheme, viewport and the
  * browser clock (see e2e/support/fixtures.ts), so there are no sleeps and no dependence on today's date.
@@ -28,7 +33,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   // A retry is only a safety net on shared CI runners; locally a flaky test must fail.
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  workers: '100%',
   timeout: 30_000,
   expect: { timeout: 7_000 },
   reporter: process.env.CI
@@ -40,8 +45,11 @@ export default defineConfig({
     locale: 'en-US',
     timezoneId: 'UTC',
     colorScheme: 'light',
-    reducedMotion: 'no-preference',
-    trace: 'retain-on-failure',
+    // The page's background animation repaints continuously (with software-rendered blur), which slows a suite that
+    // opens hundreds of pages and makes timing less predictable; the tests that are about motion opt back in.
+    reducedMotion: 'reduce',
+    // Traces cost time on every test; CI retries once and records the retry. Locally: npx playwright test --trace on.
+    trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     launchOptions: executablePath ? { executablePath } : {},
   },

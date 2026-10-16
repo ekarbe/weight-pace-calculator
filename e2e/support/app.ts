@@ -135,3 +135,17 @@ export const leakedMarkup = (page: Page) =>
 
 export const hasHorizontalOverflow = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+
+/**
+ * Switches off CSS transitions and animations for the page, so computed styles and axe's colour maths see the final
+ * state instead of a fade-in or a focus ring half-way through its transition. Not for tests about motion.
+ */
+export async function disableMotion(page: Page) {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }';
+      document.head.appendChild(style);
+    });
+  });
+}
