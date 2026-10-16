@@ -5,6 +5,7 @@ import { Header } from '@/components/ui/header';
 import { Footer } from '@/components/ui/footer';
 import { InputPanel } from '@/components/calculator/input-panel';
 import { RaceCards } from '@/components/calculator/race-cards';
+import { ShareImageCard } from '@/components/calculator/share-image-card';
 import { PaceChart } from '@/components/calculator/pace-chart';
 import { PlanCard } from '@/components/calculator/plan-card';
 import { ResultsTable } from '@/components/calculator/results-table';
@@ -121,6 +122,7 @@ export default function HomePage() {
             {results && rows.length > 0 ? (
               <>
                 <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} />
+                <ShareImageCard rows={rows} index={index} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} />
                 <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} />
                 <PlanCard startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} units={form.units} targetDate={form.targetDate} onDate={(d) => setForm((f) => ({ ...f, targetDate: d }))} />
                 <ResultsTable rows={rows} warnings={results.warnings} units={form.units} enteredWeight={form.weight} selected={index} />
