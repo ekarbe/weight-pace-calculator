@@ -3,6 +3,7 @@ import type { FormState } from './share';
 import { MAX_CUSTOM_DISTANCE_KM, MIN_CUSTOM_DISTANCE_KM } from './calculations';
 import { KM_PER_MILE, inToCm, lbToKg, secPerMileToSecPerKm } from './units';
 import { deriveRacePace, type RaceErrorKey } from './race-result';
+import { TRAINING, TRAINING_HISTORIES, type TrainingHistory } from './training';
 
 export interface AdvancedState {
     paceFactor: string;
@@ -99,4 +100,27 @@ export function buildInput(form: FormState, adv: AdvancedState): BuiltInput {
         errors,
         missing,
     };
+}
+
+export type TrainingErrorKey = 'training.err.weeklyKm.metric' | 'training.err.weeklyKm.imperial';
+
+export interface TrainingFields {
+    /** Average weekly running in km, or null when blank or invalid. */
+    weeklyKm: number | null;
+    weeklyKmError: TrainingErrorKey | null;
+    history: TrainingHistory | null;
+}
+
+/**
+ * The optional training fields. Kept apart from `buildInput` on purpose: a typo here must not blank the main results.
+ * A blank distance is simply unknown; an invalid one is an error (the card then withholds its figure instead of guessing).
+ */
+export function buildTraining(form: FormState): TrainingFields {
+    const metric = form.units === 'metric';
+    const history = TRAINING_HISTORIES.find((h) => h === form.trainingHistory) ?? null;
+    if (blank(form.weeklyKm)) return { weeklyKm: null, weeklyKmError: null, history };
+    const v = Number(form.weeklyKm.trim());
+    const km = metric ? v : v * KM_PER_MILE;
+    if (Number.isFinite(km) && km >= -1e-9 && km <= TRAINING.WEEKLY_KM_MAX + 1e-9) return { weeklyKm: Math.max(0, km), weeklyKmError: null, history };
+    return { weeklyKm: null, weeklyKmError: metric ? 'training.err.weeklyKm.metric' : 'training.err.weeklyKm.imperial', history };
 }

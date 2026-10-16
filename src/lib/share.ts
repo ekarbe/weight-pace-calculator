@@ -1,5 +1,6 @@
 import type { UnitSystem } from './units';
 import { RACE_DISTANCE_KEYS, type PaceSource, type RaceDistanceKey } from './race-result';
+import { TRAINING_HISTORIES, type TrainingHistory } from './training';
 
 export interface FormState {
     units: UnitSystem;
@@ -22,16 +23,22 @@ export interface FormState {
     raceH: string;
     raceM: string;
     raceS: string;
+    /** Optional average weekly running distance, in the selected units (km or miles). */
+    weeklyKm: string;
+    /** Optional running history; only selects a context sentence in the training card. */
+    trainingHistory: '' | TrainingHistory;
 }
 
 export const emptyForm: FormState = {
     units: 'metric', gender: '', height: '', weight: '', bodyFat: '', paceMin: '', paceSec: '', distance: '', targetDate: '',
     paceSource: 'threshold', raceDist: '5k', raceCustom: '', raceH: '', raceM: '', raceS: '',
+    weeklyKm: '', trainingHistory: '',
 };
 
 const KEYS: Record<keyof FormState, string> = {
     units: 'u', gender: 'g', height: 'h', weight: 'w', bodyFat: 'bf', paceMin: 'pm', paceSec: 'ps', distance: 'd', targetDate: 'td',
     paceSource: 'pace', raceDist: 'rd', raceCustom: 'rdc', raceH: 'rth', raceM: 'rtm', raceS: 'rts',
+    weeklyKm: 'wk', trainingHistory: 'th',
 };
 
 export function encodeForm(f: FormState): string {
@@ -69,5 +76,7 @@ export function decodeForm(query: string): FormState {
         // Seconds are 0-59, and so are minutes once hours are given (see parseRaceTime).
         raceM: raceH !== '' && Number(raceM) > 59 ? '' : raceM,
         raceS: Number(raceS) > 59 ? '' : raceS,
+        weeklyKm: num('wk'),
+        trainingHistory: TRAINING_HISTORIES.find((k) => k === p.get('th')) ?? '',
     };
 }

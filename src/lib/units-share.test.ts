@@ -19,6 +19,22 @@ describe('share', () => {
         const f = { ...emptyForm, gender: 'female' as const, height: '170', weight: '60.5', paceMin: '4', paceSec: '5', units: 'imperial' as const, distance: '15', targetDate: '2026-09-01' };
         expect(decodeForm(encodeForm(f))).toEqual(f);
     });
+    it('round-trips the training fields and leaves empty ones out of the link', () => {
+        const f = { ...emptyForm, gender: 'male' as const, height: '180', weight: '80', paceMin: '5', paceSec: '0', weeklyKm: '42.5', trainingHistory: 'some' as const };
+        expect(decodeForm(encodeForm(f))).toEqual(f);
+        expect(encodeForm(f)).toContain('wk=42.5');
+        expect(encodeForm(f)).toContain('th=some');
+        expect(encodeForm({ ...f, weeklyKm: '', trainingHistory: '' })).not.toMatch(/wk=|th=/);
+    });
+    it('validates the training fields in a shared link', () => {
+        expect(decodeForm('th=hacker&wk=<script>')).toEqual(emptyForm);
+        expect(decodeForm('wk=99999').weeklyKm).toBe('');
+        expect(decodeForm('wk=-5').weeklyKm).toBe('');
+        expect(decodeForm('wk=1e3').weeklyKm).toBe('');
+        expect(decodeForm('th=NEW').trainingHistory).toBe('');
+        expect(decodeForm('th=veteran').trainingHistory).toBe('veteran');
+        expect(decodeForm('wk=40').weeklyKm).toBe('40');
+    });
     it('rejects a malformed date', () => {
         expect(decodeForm('td=2026-9-1&h=180').targetDate).toBe('');
     });
