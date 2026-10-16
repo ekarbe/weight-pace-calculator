@@ -41,3 +41,13 @@ export function formatTime(totalSeconds: number): string {
     return `${paddedMinutes}:${paddedSeconds}`;
   }
 }
+/** "2:10" or "1:02:10" for a duration difference (always positive text; caller adds the sign). */
+export function formatDelta(totalSeconds: number): string {
+  const rounded = Math.round(Math.abs(totalSeconds));
+  const h = Math.floor(rounded / 3600);
+  const m = Math.floor((rounded % 3600) / 60);
+  const s = rounded % 60;
+  const ss = s < 10 ? `0${s}` : `${s}`;
+  if (h > 0) return `${h}:${m < 10 ? '0' : ''}${m}:${ss}`;
+  return `${m}:${ss}`;
+}
