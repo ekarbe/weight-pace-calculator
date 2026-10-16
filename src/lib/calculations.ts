@@ -7,6 +7,8 @@ const ESSENTIAL_FAT_MALE_WARN_THRESHOLD = 5;
 const ESSENTIAL_FAT_FEMALE_WARN_THRESHOLD = 13;
 const MIN_PACE_SEC_MALE = 2 * 60 + 40;
 const MIN_PACE_SEC_FEMALE = 3 * 60 + 0;
+/** Fastest threshold pace (s/km) the model returns for a sex; faster estimates are capped here. */
+export const minPaceSecFor = (gender: UserInput['gender']): number => (gender === 'male' ? MIN_PACE_SEC_MALE : MIN_PACE_SEC_FEMALE);
 
 
 const RACE_DISTANCES = {
