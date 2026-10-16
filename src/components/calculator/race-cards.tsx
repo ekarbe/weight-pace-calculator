@@ -4,6 +4,7 @@ import { useId } from 'react';
 import { AlertTriangle, HeartPulse } from 'lucide-react';
 import { cn, formatDelta, formatPace, formatTime } from '@/lib/utils';
 import { estimateRaceTimeSec, type ResultRow } from '@/lib/calculations';
+import { bandValue, timeSavedRange, type Band, type BandMetric } from '@/lib/band';
 import { kgToLb, secPerKmToSecPerMile, unitLabels, type UnitSystem } from '@/lib/units';
 import { useI18n } from '@/i18n/provider';
 import type { MessageKey } from '@/i18n/messages/en';
@@ -17,6 +18,7 @@ interface Props {
   enteredWeight: string;
   customKm: number | null;
   customLabel: string;
+  band: Band | null;
 }
 
 const RACES = [
@@ -28,12 +30,14 @@ const RACES = [
 
 const STRIPE = 'bg-[repeating-linear-gradient(90deg,var(--foreground)_0_8px,transparent_8px_16px)]';
 
-function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel }: { chip: string; chipClass: string; sub: string; timeSec: number; time: string; saved: number; srLabel: string }) {
+function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel, range }: { chip: string; chipClass: string; sub: string; timeSec: number; time: string; saved: number; srLabel: string; range: { low: number; high: number } | null }) {
   const { t, speak } = useI18n();
+  const showRange = range !== null && saved > 0.5 && formatDelta(range.low) !== formatDelta(range.high);
   return (
     <>
       <p className="sr-only">
         {saved > 0.5 ? t('race.srFaster', { race: srLabel, time: speak(timeSec), delta: speak(saved) }) : t('race.srSame', { race: srLabel, time: speak(timeSec) })}
+        {showRange && `. ${t('band.card.srRange', { low: speak(range.low), high: speak(range.high) })}`}
       </p>
       <div aria-hidden>
         <span className={cn('inline-block rounded-md px-2 py-0.5 text-lg font-black tracking-tight', chipClass)}>{chip}</span>
@@ -41,6 +45,7 @@ function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel }: { chi
         <p className="mt-2 text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-foreground">{time}</p>
         <p className={cn('mt-1 text-sm font-semibold tabular-nums', saved > 0.5 ? 'text-primary-ink' : 'text-muted-foreground')}>
           {saved > 0.5 ? `−${formatDelta(saved)}` : t('race.baseline')}
+          {showRange && <span className="block text-xs font-normal text-muted-foreground">{t('band.card.range', { low: formatDelta(range.low), high: formatDelta(range.high) })}</span>}
         </p>
       </div>
       <div aria-hidden className={cn('absolute inset-x-0 bottom-0 h-1.5 opacity-70', STRIPE)} />
@@ -48,7 +53,7 @@ function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel }: { chi
   );
 }
 
-export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm, customLabel }: Props) {
+export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm, customLabel, band }: Props) {
   const { t, num, speak } = useI18n();
   const headingId = useId();
   const labels = unitLabels(units);
@@ -61,6 +66,9 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
   const pace = sel.estimatedThresholdPaceSec;
   const paceText = pace === null ? '–' : formatPace(units === 'metric' ? pace : secPerKmToSecPerMile(pace));
   const tenKSaved = (base.estimated10kTimeSec ?? 0) - (sel.estimated10kTimeSec ?? 0);
+  const edges = band?.rows[index];
+  const rangeOf = (baseSec: number, metric: BandMetric) =>
+    edges ? timeSavedRange(baseSec, bandValue(edges.conservative, metric, customKm), bandValue(edges.optimistic, metric, customKm)) : null;
   const sliderText =
     index === 0
       ? t('target.sliderNow', { weight: disp(sel.targetWeightKg, index), unit: labels.weight })
@@ -110,7 +118,7 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {RACES.map((race) => (
           <li key={race.key} className="relative overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4">
-            <RaceFace chip={race.key} chipClass="bg-foreground text-background" sub={t(race.long)} timeSec={race.time(sel) ?? 0} time={race.text(sel)} saved={(race.time(base) ?? 0) - (race.time(sel) ?? 0)} srLabel={t(race.long)} />
+            <RaceFace chip={race.key} chipClass="bg-foreground text-background" sub={t(race.long)} timeSec={race.time(sel) ?? 0} time={race.text(sel)} saved={(race.time(base) ?? 0) - (race.time(sel) ?? 0)} srLabel={t(race.long)} range={rangeOf(race.time(base) ?? 0, race.key)} />
           </li>
         ))}
         {customKm !== null && (
@@ -123,6 +131,7 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
               time={formatTime(estimateRaceTimeSec(sel.estimatedThresholdPaceSec ?? 0, customKm))}
               saved={estimateRaceTimeSec(base.estimatedThresholdPaceSec ?? 0, customKm) - estimateRaceTimeSec(sel.estimatedThresholdPaceSec ?? 0, customKm)}
               srLabel={customLabel}
+              range={rangeOf(estimateRaceTimeSec(base.estimatedThresholdPaceSec ?? 0, customKm), 'custom')}
             />
           </li>
         )}

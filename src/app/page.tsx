@@ -9,6 +9,7 @@ import { PaceChart } from '@/components/calculator/pace-chart';
 import { PlanCard } from '@/components/calculator/plan-card';
 import { ResultsTable } from '@/components/calculator/results-table';
 import { calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DEFAULT_TARGET_BMI_FLOOR } from '@/lib/calculations';
+import { calculateBand } from '@/lib/band';
 import { useI18n } from '@/i18n/provider';
 import type { MessageKey } from '@/i18n/messages/en';
 import { buildInput, type AdvancedState } from '@/lib/form';
@@ -43,6 +44,7 @@ export default function HomePage() {
   const built = useMemo(() => buildInput(form, adv), [form, adv]);
   const results = useMemo(() => (built.input ? calculateWeightPaceEstimates(built.input) : null), [built.input]);
   const rows = useMemo(() => results?.resultsTable ?? [], [results]);
+  const band = useMemo(() => (built.input ? calculateBand(built.input) : null), [built.input]);
 
   const defaultIndex = useMemo(() => {
     if (rows.length === 0) return 0;
@@ -122,8 +124,8 @@ export default function HomePage() {
             <p role="status" className="sr-only">{rows.length > 0 ? t('sr.ready') : ''}</p>
             {results && rows.length > 0 ? (
               <>
-                <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} />
-                <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} />
+                <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
+                <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
                 <PlanCard startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} units={form.units} targetDate={form.targetDate} onDate={(d) => setForm((f) => ({ ...f, targetDate: d }))} />
                 <ResultsTable rows={rows} warnings={results.warnings} units={form.units} enteredWeight={form.weight} selected={index} />
               </>
