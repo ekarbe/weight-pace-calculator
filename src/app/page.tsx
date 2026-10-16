@@ -9,6 +9,7 @@ import { ShareImageCard } from '@/components/calculator/share-image-card';
 import { PaceChart } from '@/components/calculator/pace-chart';
 import { PlanCard } from '@/components/calculator/plan-card';
 import { ResultsTable } from '@/components/calculator/results-table';
+import { PrintButton, PrintFooter, PrintInputs } from '@/components/calculator/print';
 import { calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DEFAULT_TARGET_BMI_FLOOR } from '@/lib/calculations';
 import { calculateBand } from '@/lib/band';
 import { useI18n } from '@/i18n/provider';
@@ -111,13 +112,13 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col">
       <Header />
       <main id="main" tabIndex={-1} className="container mx-auto flex-grow px-4 py-8 sm:py-12">
-        <div className="mb-8 max-w-3xl">
+        <div className="mb-8 max-w-3xl print:hidden">
           <h1 className="text-4xl! sm:text-6xl! font-black uppercase">{t('hero.title')}</h1>
           <p className="mt-3 text-base sm:text-lg">{t('hero.subtitle')}</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[22rem_1fr] lg:items-start">
-          <div className="rounded-3xl border bg-card glassmorphism p-5 sm:p-6 lg:sticky lg:top-24">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[22rem_1fr] lg:items-start print:block">
+          <div className="rounded-3xl border bg-card glassmorphism p-5 sm:p-6 lg:sticky lg:top-24 print:hidden">
             <InputPanel form={form} adv={adv} errors={built.errors} copied={copied} onChange={change} onUnits={switchUnits} onAdv={(p) => setAdv((a) => ({ ...a, ...p }))} onShare={share} />
           </div>
 
@@ -125,11 +126,13 @@ export default function HomePage() {
             <p role="status" className="sr-only">{rows.length > 0 ? t('sr.ready') : ''}</p>
             {results && rows.length > 0 ? (
               <>
+                <PrintInputs form={form} adv={adv} startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} />
                 <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
                 <ShareImageCard rows={rows} index={index} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} />
                 <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
                 <PlanCard startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} units={form.units} targetDate={form.targetDate} onDate={(d) => setForm((f) => ({ ...f, targetDate: d }))} />
                 <ResultsTable rows={rows} warnings={results.warnings} units={form.units} enteredWeight={form.weight} selected={index} />
+                <PrintButton />
               </>
             ) : (
               <div className="rounded-3xl border-2 border-dashed p-8 text-center">
@@ -151,6 +154,7 @@ export default function HomePage() {
         </div>
       </main>
       <Footer />
+      <PrintFooter />
     </div>
   );
 }

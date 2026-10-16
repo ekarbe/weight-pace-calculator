@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n/provider';
 export function Footer() {
   const { t } = useI18n();
   return (
-    <footer className="mt-12 border-t">
+    <footer className="mt-12 border-t print:hidden">
       <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 p-4 text-sm text-muted-foreground px-4">
         <div>
           {t('footer.by')}{' '}
