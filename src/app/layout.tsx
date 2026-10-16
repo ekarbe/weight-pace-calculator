@@ -3,11 +3,12 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from 'next-themes'
 import { cn } from "@/lib/utils";
+import { I18nProvider } from "@/i18n/provider";
+import { SkipLink } from "@/components/ui/skip-link";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Weight-Pace Calculator",
   description: "Estimate running pace improvements based on weight loss.",
 };
 
@@ -30,8 +31,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="mesh-background" />
-          {children}
+          <I18nProvider>
+            <SkipLink />
+            <div className="mesh-background" aria-hidden />
+            {children}
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

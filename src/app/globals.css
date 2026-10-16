@@ -65,7 +65,8 @@
   --destructive: #ff3b30;
   --border: rgba(0, 0, 0, 0.04);
   --input: rgba(0, 0, 0, 0.08);
-  --ring: #34c759;
+  /* Darker than --primary so focus indicators reach 3:1 on light surfaces. */
+  --ring: #117a35;
   --chart-1: #34c759;
   --chart-2: #30b0c7;
   --chart-3: #007aff;
@@ -115,6 +116,12 @@
   body {
     @apply bg-background text-foreground;
   }
+  :focus-visible {
+    outline-style: solid;
+    outline-width: 2px;
+    outline-offset: 2px;
+    outline-color: var(--ring);
+  }
 
   h1 {
     @apply text-[3.5rem] font-[800] tracking-[-0.03em] leading-tight;
@@ -158,4 +165,16 @@
 .glassmorphism {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesh-background {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

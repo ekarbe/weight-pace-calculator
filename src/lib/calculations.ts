@@ -46,10 +46,21 @@ export interface ResultRow {
     paceLimited: boolean;
 }
 
+export type WarningCode =
+    | 'selectGender' | 'invalidHeight' | 'invalidWeight' | 'bodyFatOutOfRange' | 'bodyFatMissing'
+    | 'invalidPace' | 'leanMassNonPositive' | 'paceImprovementTooLarge' | 'unhealthyFat' | 'zeroFat'
+    | 'paceCapped' | 'belowFloor' | 'disclaimerModel' | 'disclaimerHealth';
+
+/** Locale-free warning; the UI turns `code` + `params` into text (message key `warn.<code>`). */
+export interface Warning {
+    code: WarningCode;
+    params?: Record<string, string | number>;
+}
+
 export interface CalculationResults {
     minHealthyWeightKg: number | null;
     resultsTable: ResultRow[];
-    warnings: string[];
+    warnings: Warning[];
 }
 
 export function calculateMinHealthyWeight(heightCm: number, bmi: number = MIN_HEALTHY_BMI): number | null {
@@ -104,18 +115,18 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
         warnings: [],
     };
 
-    if (!input.gender) results.warnings.push("Please select a biological gender.");
+    if (!input.gender) results.warnings.push({ code: 'selectGender' });
     if (!input.heightCm || input.heightCm <= 50) {
-        results.warnings.push("Please enter a valid height in cm (>50). Height is required to estimate a minimum healthy weight based on BMI.");
+        results.warnings.push({ code: 'invalidHeight' });
     }
-    if (!input.weightKg || input.weightKg <= 20) results.warnings.push("Please enter a valid weight in kg (>20).");
+    if (!input.weightKg || input.weightKg <= 20) results.warnings.push({ code: 'invalidWeight' });
 
     const bodyFatProvided = input.bodyFatPercentage !== null && input.bodyFatPercentage >= 5 && input.bodyFatPercentage <= 70;
     if (input.bodyFatPercentage !== null && !bodyFatProvided) {
-        results.warnings.push("Body Fat Percentage provided is outside the typical range (5-70%). Calculations requiring it will be skipped.");
+        results.warnings.push({ code: 'bodyFatOutOfRange' });
     }
     if (!bodyFatProvided) {
-        results.warnings.push("Body Fat Percentage not provided or invalid. Body fat estimations and related warnings are unavailable. The minimum healthy weight is based solely on BMI.");
+        results.warnings.push({ code: 'bodyFatMissing' });
     }
 
 
@@ -125,7 +136,7 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
         input.thresholdPaceSec == null || input.thresholdPaceSec < 0 || input.thresholdPaceSec >= 60 ||
         initialThresholdPaceSec <= 0;
     if (paceInvalid) {
-        results.warnings.push("Please enter a valid threshold pace greater than 0:00 min/km.");
+        results.warnings.push({ code: 'invalidPace' });
     }
     if (paceInvalid || !input.gender || !input.heightCm || input.heightCm <= 50 || !input.weightKg || input.weightKg <= 20) {
         return results;
@@ -142,7 +153,7 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
     if (bodyFatProvided && input.bodyFatPercentage) {
         lbmKg = input.weightKg * (1 - input.bodyFatPercentage / 100);
         if (lbmKg <= 0) {
-            results.warnings.push("Calculated Lean Body Mass is zero or negative. Body fat estimations will be skipped.");
+            results.warnings.push({ code: 'leanMassNonPositive' });
             lbmKg = null;
         }
     }
@@ -186,7 +197,7 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
         const rawEstimatedPaceSec = initialThresholdPaceSec - paceImprovementSec;
 
         if (rawEstimatedPaceSec <= 0) {
-            results.warnings.push("Warning: Estimated pace improvement is very large, leading to unrealistic raw pace estimates (<= 0:00 min/km). Rows beyond this point are not generated.");
+            results.warnings.push({ code: 'paceImprovementTooLarge' });
             break;
         }
 
@@ -225,19 +236,19 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
     }
 
     if (unhealthyFatWarningNeeded) {
-        results.warnings.push(`Highlighted rows indicate estimated body fat below potentially healthy levels (${input.gender === 'male' ? ESSENTIAL_FAT_MALE_WARN_THRESHOLD : ESSENTIAL_FAT_FEMALE_WARN_THRESHOLD}% for ${input.gender}). Reaching such low body fat can have health risks. Consult a healthcare professional.`);
+        results.warnings.push({ code: 'unhealthyFat', params: { threshold: essentialFatLowerBound, sex: input.gender } });
     }
     if (zeroFatWarningHit) {
-        results.warnings.push("Warning: Calculations stopped as target weight reached the estimated Lean Body Mass (approx. 0% body fat), which is physically impossible.");
+        results.warnings.push({ code: 'zeroFat' });
     }
     if (paceLimitHitWarningNeeded) {
-        results.warnings.push(`Estimated threshold pace has been capped at the minimum defined limit (${formatPace(minPaceSec)} min/km for ${input.gender}) for some weights.`);
+        results.warnings.push({ code: 'paceCapped', params: { pace: formatPace(minPaceSec), sex: input.gender } });
     }
     if (results.minHealthyWeightKg && input.weightKg <= results.minHealthyWeightKg) {
-        results.warnings.push(`Your current weight is already at or below the lowest weight shown (BMI ${bmiFloor}). Further weight loss is generally not recommended without medical supervision.`);
+        results.warnings.push({ code: 'belowFloor', params: { bmi: bmiFloor } });
     }
-    results.warnings.push(`Disclaimer: These calculations are estimations based on general physiological principles and rules of thumb (e.g., ~${paceFactor} sec/km improvement per kg lost, constant lean mass if BF% provided). Actual results vary significantly based on individual genetics, training adaptations, nutrition, body composition changes, and other factors.`);
-    results.warnings.push("Weight loss should be approached healthily. Aim for gradual loss and consult with healthcare professionals or registered dietitians before making significant changes, especially when aiming for low body weight.");
+    results.warnings.push({ code: 'disclaimerModel', params: { factor: paceFactor } });
+    results.warnings.push({ code: 'disclaimerHealth' });
 
 
     return results;

@@ -5,6 +5,7 @@ import { cn, formatPace, formatTime } from '@/lib/utils';
 import type { ResultRow } from '@/lib/calculations';
 import { estimateRaceTimeSec } from '@/lib/calculations';
 import { kgToLb, secPerKmToSecPerMile, unitLabels, type UnitSystem } from '@/lib/units';
+import { useI18n } from '@/i18n/provider';
 
 type Metric = 'pace' | '5K' | '10K' | 'HM' | 'M' | 'custom';
 
@@ -22,6 +23,7 @@ const H = 260;
 const PAD = { l: 56, r: 16, t: 16, b: 32 };
 
 export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }: Props) {
+  const { t, num, speak } = useI18n();
   const [metric, setMetric] = useState<Metric>('10K');
   const svgRef = useRef<SVGSVGElement>(null);
   const labels = unitLabels(units);
@@ -29,11 +31,11 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
 
   const active: Metric = metric === 'custom' && customKm === null ? '10K' : metric;
   const options: { key: Metric; label: string }[] = [
-    { key: 'pace', label: 'Pace' },
-    { key: '5K', label: '5K' },
-    { key: '10K', label: '10K' },
-    { key: 'HM', label: 'Half' },
-    { key: 'M', label: 'Marathon' },
+    { key: 'pace', label: t('chart.pace') },
+    { key: '5K', label: t('table.5k') },
+    { key: '10K', label: t('table.10k') },
+    { key: 'HM', label: t('chart.half') },
+    { key: 'M', label: t('chart.marathon') },
     ...(customKm !== null ? [{ key: 'custom' as const, label: customLabel }] : []),
   ];
 
@@ -65,7 +67,7 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
   }, [rows, active, units, customKm]);
 
   const path = geo.vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${geo.x(i).toFixed(1)},${geo.y(v).toFixed(1)}`).join(' ');
-  const dispW = (kg: number) => (units === 'metric' ? kg : kgToLb(kg)).toFixed(0);
+  const dispW = (kg: number) => num(units === 'metric' ? kg : kgToLb(kg), 0);
 
   const scrub = (clientX: number) => {
     const el = svgRef.current;
@@ -85,9 +87,9 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
     <section aria-labelledby={`${tabsId}-h`} className="rounded-3xl border bg-card glassmorphism p-5 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id={`${tabsId}-h`} className="text-sm! font-bold uppercase tracking-widest text-muted-foreground">
-          {active === 'pace' ? `Threshold pace (${labels.pace})` : 'Race time'} vs. weight
+          {active === 'pace' ? t('chart.heading.pace', { unit: labels.pace }) : t('chart.heading.time')}
         </h2>
-        <div role="group" aria-label="Chart metric" className="flex flex-wrap gap-1">
+        <div role="group" aria-label={t('chart.group')} className="flex flex-wrap gap-1">
           {options.map((o) => (
             <button
               key={o.key}
@@ -110,7 +112,11 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label={`Line chart of ${active === 'pace' ? 'threshold pace' : 'race time'} against weight. At ${dispW(sel.targetWeightKg)} ${labels.weight}: ${fmt(geo.vals[index])}.`}
+        aria-label={t('chart.aria', {
+          metric: t(active === 'pace' ? 'chart.metric.pace' : 'chart.metric.time'),
+          weight: dispW(sel.targetWeightKg), unit: labels.weight, value: speak(geo.vals[index]),
+          from: speak(geo.vals[0]), w1: dispW(rows[0].targetWeightKg), to: speak(geo.vals[rows.length - 1]), w2: dispW(rows[rows.length - 1].targetWeightKg),
+        })}
         className="mt-4 w-full select-none"
         style={{ touchAction: 'pan-y' }}
         onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); scrub(e.clientX); }}

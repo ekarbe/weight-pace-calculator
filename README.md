@@ -13,12 +13,13 @@ A web application built with Next.js and shadcn/ui to estimate potential running
 *   **Custom distance:** Add any race distance from 1 to 100 km (or the mile equivalent). Its pace factor is interpolated between the 5K, 10K, half marathon and marathon anchors.
 *   **Pace chart:** Line chart of threshold pace or any race time against weight. Click or drag on it to move the slider.
 *   **Timeline:** Shows how long the selected weight loss takes at a sustainable 0.5% of body weight per week. Enter a target date to see the weekly rate it needs, rated sustainable, brisk (above 0.5%) or too fast (above 1%).
+*   **Languages:** English, German, Spanish and French. The language is picked from `?lang=`, your last choice, or the browser setting, and can be changed in the header. Share links include the language. Numbers, dates and plurals follow the locale.
 *   **Units:** Switch between kg / cm / min per km and lb / in / min per mile. Entered values are converted when you switch.
 *   **Shareable links:** "Copy share link" encodes your inputs in the URL; the link is validated when it loads.
 *   **Adjustable assumptions:** Change the pace gain per kg lost (default 2 s/km) and the lowest BMI shown (default 20, never below 18.5).
 *   **Health safeguards:** A health note is always visible, the table stops at BMI 20 by default, and warnings appear when estimated body fat is below healthy levels or the pace is capped.
 *   **Full table:** All weights in 0.5 kg steps, with estimated body fat if you entered it. Collapsed by default.
-*   **Responsive, accessible UI:** Mobile-first layout, labelled form controls, light and dark mode (`next-themes`). Checked with axe-core (WCAG 2.1 AA) in light, dark and mobile layouts with no violations.
+*   **Responsive, accessible UI:** Mobile-first layout, labelled form controls, light and dark mode (`next-themes`). Skip link, labelled controls and groups, a slider whose value is announced in words, visually hidden text equivalents for the race cards, a captioned and keyboard-reachable table, visible focus indicators and `prefers-reduced-motion` support. Checked with axe-core (WCAG 2.1 AA) in all four languages, light, dark and mobile, with no violations.
 
 ## 🚀 Tech Stack
 
@@ -28,6 +29,7 @@ A web application built with Next.js and shadcn/ui to estimate potential running
 *   **UI Components:** shadcn/ui on Radix UI
 *   **Icons:** Lucide React, custom SVG icon
 *   **Testing:** Vitest
+*   **i18n:** Small typed dictionary layer in `src/i18n` (no dependency)
 *   **Tooling:** ESLint 10 (flat config), Node 22+
 
 > TypeScript is held at 6.x because typescript-eslint does not support 7.x yet.
@@ -78,13 +80,17 @@ Open "Advanced assumptions" to change the pace gain per kg or the lowest BMI sho
 npm run dev        # dev server
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
-npm test           # Vitest (calculation, units, form, share-link and planning logic)
+npm test           # Vitest (calculation, units, form, share-link, planning and i18n logic)
 npm run build      # static export to ./out
 ```
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and the build on every pull request. Pushes to `main` deploy to GitHub Pages (`deploy.yml`).
 
-Project layout: `src/lib/` holds the pure logic (calculation, units, form validation, share links); `src/components/calculator/` holds the input panel, race cards and results table.
+### Adding or changing a language
+
+All text lives in `src/i18n/messages/`. `en.ts` is the source; `de.ts`, `es.ts` and `fr.ts` are typed against it, so a missing key fails the build. To add a language, create `xx.ts`, add it to `LOCALES`, `LOCALE_NAMES` and `MESSAGES` in `src/i18n/core.ts`, and run `npm test`. The tests check that every language has the same keys, placeholders (`{name}`) and emphasis tags (`<b>`, `<r>`, `<g>`). Warnings from the calculation logic are message codes (`warn.*`), not sentences.
+
+Project layout: `src/lib/` holds the pure logic (calculation, units, form validation, share links); `src/components/calculator/` holds the input panel, race cards, chart, timeline and results table; `src/i18n/` holds the translation core and provider.
 
 ## 💡 Calculation Logic & Disclaimer
 
