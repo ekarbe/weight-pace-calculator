@@ -8,7 +8,13 @@ export interface AdvancedState {
     bmiFloor: string;
 }
 
-export type FieldErrors = Partial<Record<'gender' | 'height' | 'weight' | 'bodyFat' | 'pace' | 'advanced' | 'distance', string>>;
+/** Values are message keys (see src/i18n/messages), not display text. */
+export type FieldErrors = Partial<Record<'gender' | 'height' | 'weight' | 'bodyFat' | 'pace' | 'advanced' | 'distance', ErrorKey>>;
+
+export type ErrorKey =
+    | 'err.height.metric' | 'err.height.imperial' | 'err.weight.metric' | 'err.weight.imperial'
+    | 'err.bodyFat' | 'err.pace' | 'err.paceFactor' | 'err.bmiFloor'
+    | 'err.distance.metric' | 'err.distance.imperial';
 
 export interface BuiltInput {
     input: UserInput | null;
@@ -31,25 +37,25 @@ export function buildInput(form: FormState, adv: AdvancedState): BuiltInput {
     const h = parseFloat(form.height);
     const heightCm = metric ? h : inToCm(h);
     if (blank(form.height)) missing.push('height');
-    else if (!(heightCm > 50 && heightCm < 272)) errors.height = metric ? 'Enter 50–272 cm' : 'Enter 20–107 in';
+    else if (!(heightCm > 50 && heightCm < 272)) errors.height = metric ? 'err.height.metric' : 'err.height.imperial';
 
     const w = parseFloat(form.weight);
     const weightKg = metric ? w : lbToKg(w);
     if (blank(form.weight)) missing.push('weight');
-    else if (!(weightKg > 20 && weightKg < 400)) errors.weight = metric ? 'Enter 20–400 kg' : 'Enter 45–880 lb';
+    else if (!(weightKg > 20 && weightKg < 400)) errors.weight = metric ? 'err.weight.metric' : 'err.weight.imperial';
 
     let bodyFat: number | null = null;
     if (!blank(form.bodyFat)) {
         const bf = parseFloat(form.bodyFat);
         if (bf >= 5 && bf <= 70) bodyFat = bf;
-        else errors.bodyFat = 'If entered, use 5–70%';
+        else errors.bodyFat = 'err.bodyFat';
     }
 
     const pm = parseInt(form.paceMin, 10);
     const ps = parseInt(form.paceSec, 10);
     let perKm = NaN;
     if (blank(form.paceMin) || blank(form.paceSec)) missing.push('pace');
-    else if (isNaN(pm) || isNaN(ps) || pm < 0 || ps < 0 || ps >= 60 || pm * 60 + ps === 0) errors.pace = 'Enter a valid pace (> 0:00)';
+    else if (isNaN(pm) || isNaN(ps) || pm < 0 || ps < 0 || ps >= 60 || pm * 60 + ps === 0) errors.pace = 'err.pace';
     else {
         const total = pm * 60 + ps;
         perKm = Math.round(metric ? total : secPerMileToSecPerKm(total));
@@ -60,13 +66,13 @@ export function buildInput(form: FormState, adv: AdvancedState): BuiltInput {
         const d = parseFloat(form.distance);
         const km = metric ? d : d * KM_PER_MILE;
         if (km >= MIN_CUSTOM_DISTANCE_KM && km <= MAX_CUSTOM_DISTANCE_KM) customDistanceKm = km;
-        else errors.distance = metric ? 'Enter 1–100 km' : 'Enter 0.6–62 mi';
+        else errors.distance = metric ? 'err.distance.metric' : 'err.distance.imperial';
     }
 
     const factor = parseFloat(adv.paceFactor);
     const floor = parseFloat(adv.bmiFloor);
-    if (isNaN(factor) || factor < 0 || factor > 5) errors.advanced = 'Pace gain must be 0–5 s/km per kg';
-    else if (isNaN(floor) || floor < 18.5 || floor > 30) errors.advanced = 'BMI floor must be 18.5–30';
+    if (isNaN(factor) || factor < 0 || factor > 5) errors.advanced = 'err.paceFactor';
+    else if (isNaN(floor) || floor < 18.5 || floor > 30) errors.advanced = 'err.bmiFloor';
 
     if (missing.length || Object.keys(errors).length || !form.gender) {
         return { input: null, customDistanceKm, errors, missing };

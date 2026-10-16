@@ -9,6 +9,8 @@ import { PaceChart } from '@/components/calculator/pace-chart';
 import { PlanCard } from '@/components/calculator/plan-card';
 import { ResultsTable } from '@/components/calculator/results-table';
 import { calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DEFAULT_TARGET_BMI_FLOOR } from '@/lib/calculations';
+import { useI18n } from '@/i18n/provider';
+import type { MessageKey } from '@/i18n/messages/en';
 import { buildInput, type AdvancedState } from '@/lib/form';
 import { decodeForm, emptyForm, encodeForm, type FormState } from '@/lib/share';
 import { KM_PER_MILE, cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm, type UnitSystem } from '@/lib/units';
@@ -20,6 +22,7 @@ const convert = (v: string, fn: (n: number) => number) => {
 };
 
 export default function HomePage() {
+  const { t, locale, list, warning } = useI18n();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [adv, setAdv] = useState<AdvancedState>({
     paceFactor: String(DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM),
@@ -84,8 +87,9 @@ export default function HomePage() {
   };
 
   const share = async () => {
-    const q = encodeForm(form);
-    const url = `${window.location.origin}${window.location.pathname}${q ? `?${q}` : ''}`;
+    const params = new URLSearchParams(encodeForm(form));
+    params.set('lang', locale);
+    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, '', url);
     try {
       await navigator.clipboard.writeText(url);
@@ -97,15 +101,14 @@ export default function HomePage() {
   };
 
   const customLabel = form.distance ? `${parseFloat(form.distance)} ${form.units === 'metric' ? 'km' : 'mi'}` : '';
-  const missingLabels: Record<string, string> = { gender: 'sex', height: 'height', weight: 'weight', pace: 'threshold pace' };
 
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="container mx-auto flex-grow px-4 py-8 sm:py-12">
+      <main id="main" tabIndex={-1} className="container mx-auto flex-grow px-4 py-8 sm:py-12">
         <div className="mb-8 max-w-3xl">
-          <h1 className="text-4xl! sm:text-6xl! font-black uppercase">How much faster could you run?</h1>
-          <p className="mt-3 text-base sm:text-lg">Enter your stats, then drag the weight slider to see estimated 5K to marathon times.</p>
+          <h1 className="text-4xl! sm:text-6xl! font-black uppercase">{t('hero.title')}</h1>
+          <p className="mt-3 text-base sm:text-lg">{t('hero.subtitle')}</p>
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[22rem_1fr] lg:items-start">
@@ -114,6 +117,7 @@ export default function HomePage() {
           </div>
 
           <div className="min-w-0 space-y-6">
+            <p role="status" className="sr-only">{rows.length > 0 ? t('sr.ready') : ''}</p>
             {results && rows.length > 0 ? (
               <>
                 <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} />
@@ -125,14 +129,14 @@ export default function HomePage() {
               <div className="rounded-3xl border-2 border-dashed p-8 text-center">
                 {results ? (
                   <>
-                    <p className="font-semibold text-foreground">No results for these inputs.</p>
-                    <ul className="mt-2 space-y-1 text-sm">{results.warnings.slice(0, 3).map((w, i) => <li key={i}>{w}</li>)}</ul>
+                    <p className="font-semibold text-foreground">{t('empty.noResults')}</p>
+                    <ul className="mt-2 space-y-1 text-sm">{results.warnings.slice(0, 3).map((w, i) => <li key={i}>{warning(w)}</li>)}</ul>
                   </>
                 ) : (
                   <p>
                     {built.missing.length > 0
-                      ? `Still needed: ${built.missing.map((m) => missingLabels[m]).join(', ')}.`
-                      : 'Fix the highlighted fields to see your estimates.'}
+                      ? t('empty.missing', { fields: list(built.missing.map((m) => t(`missing.${m}` as MessageKey))) })
+                      : t('empty.fix')}
                   </p>
                 )}
               </div>

@@ -47,7 +47,7 @@ describe('calculateWeightPaceEstimates', () => {
     it('returns no rows and a pace warning for zero pace', () => {
         const r = calculateWeightPaceEstimates({ ...base, thresholdPaceMin: 0, thresholdPaceSec: 0 });
         expect(r.resultsTable).toHaveLength(0);
-        expect(r.warnings.some(w => w.includes('valid threshold pace'))).toBe(true);
+        expect(r.warnings.some(w => w.code === 'invalidPace')).toBe(true);
     });
     it('does not depend on warning order for invalid pace', () => {
         const r = calculateWeightPaceEstimates({ ...base, bodyFatPercentage: 3, thresholdPaceSec: 75 });
@@ -60,7 +60,7 @@ describe('calculateWeightPaceEstimates', () => {
     });
     it('emits the zero-pace warning only once', () => {
         const r = calculateWeightPaceEstimates({ ...base, gender: '' as never, thresholdPaceMin: 0, thresholdPaceSec: 30 });
-        expect(r.warnings.filter(w => w.includes('very large')).length).toBeLessThanOrEqual(1);
+        expect(r.warnings.filter(w => w.code === 'paceImprovementTooLarge').length).toBeLessThanOrEqual(1);
     });
     it('flags unhealthy body fat and stops at lean mass', () => {
         const r = calculateWeightPaceEstimates({ ...base, bodyFatPercentage: 12 });
@@ -69,6 +69,6 @@ describe('calculateWeightPaceEstimates', () => {
     });
     it('warns when already at/below min healthy weight', () => {
         const r = calculateWeightPaceEstimates({ ...base, weightKg: 58 });
-        expect(r.warnings.some(w => w.includes('minimum healthy weight'))).toBe(true);
+        expect(r.warnings.some(w => w.code === 'belowFloor')).toBe(true);
     });
 });
