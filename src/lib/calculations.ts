@@ -86,11 +86,15 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
 
 
     const initialThresholdPaceSec = (input.thresholdPaceMin ?? 0) * 60 + (input.thresholdPaceSec ?? 0);
-    if (input.thresholdPaceMin === null || input.thresholdPaceMin < 0 || input.thresholdPaceSec === null || input.thresholdPaceSec < 0 || input.thresholdPaceSec >= 60 || initialThresholdPaceSec <= 0) {
+    const paceInvalid =
+        input.thresholdPaceMin == null || input.thresholdPaceMin < 0 ||
+        input.thresholdPaceSec == null || input.thresholdPaceSec < 0 || input.thresholdPaceSec >= 60 ||
+        initialThresholdPaceSec <= 0;
+    if (paceInvalid) {
         results.warnings.push("Please enter a valid threshold pace greater than 0:00 min/km.");
-        if (results.warnings.length > 1 || !input.weightKg || !input.heightCm || initialThresholdPaceSec <= 0) {
-            return results;
-        }
+    }
+    if (paceInvalid || !input.gender || !input.heightCm || input.heightCm <= 50 || !input.weightKg || input.weightKg <= 20) {
+        return results;
     }
 
     const essentialFatLowerBound = input.gender === 'male' ? ESSENTIAL_FAT_MALE_WARN_THRESHOLD : (input.gender === 'female' ? ESSENTIAL_FAT_FEMALE_WARN_THRESHOLD : 0);
@@ -117,8 +121,10 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
     const absoluteMinWeight = 30;
     const endWeight = endWeightBmi ?? absoluteMinWeight;
 
-    for (let currentWeight = startWeight; currentWeight >= endWeight; currentWeight -= 0.5) {
-        const targetWeight = Math.max(currentWeight, endWeight);
+    const WEIGHT_STEP_KG = 0.5;
+    const stepCount = Math.max(0, Math.ceil((startWeight - endWeight) / WEIGHT_STEP_KG - 1e-9));
+    for (let step = 0; step <= stepCount; step++) {
+        const targetWeight = Math.max(startWeight - step * WEIGHT_STEP_KG, endWeight);
         if (lbmKg !== null && targetWeight <= lbmKg) {
             zeroFatWarningHit = true;
             break;
@@ -144,9 +150,7 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
         const rawEstimatedPaceSec = initialThresholdPaceSec - paceImprovementSec;
 
         if (rawEstimatedPaceSec <= 0) {
-            if (!results.warnings.some(w => w.includes("pace estimate reached zero"))) {
-                results.warnings.push("Warning: Estimated pace improvement is very large, leading to unrealistic raw pace estimates (<= 0:00 min/km). Rows beyond this point are not generated.");
-            }
+            results.warnings.push("Warning: Estimated pace improvement is very large, leading to unrealistic raw pace estimates (<= 0:00 min/km). Rows beyond this point are not generated.");
             break;
         }
 
