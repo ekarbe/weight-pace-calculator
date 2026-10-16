@@ -88,6 +88,21 @@ describe('printFacts', () => {
         const f = printFacts(form({ gender: '', bodyFat: '', distance: '', height: '', weight: '', paceMin: '', paceSec: '' }), adv, { startKg: 64, targetKg: 64 }, today);
         expect(f).toMatchObject({ sex: null, bodyFat: null, distance: null, height: null, weight: null, pace: null, targetDate: null });
     });
+    it('prints the pace derived from a recent race, never the hidden typed one', () => {
+        const race = { paceSource: 'race', raceDist: '10k', raceH: '', raceM: '50', raceS: '0' } as const;
+        const f = printFacts(form({ ...race, paceMin: '9', paceSec: '59' }), adv, { startKg: 64, targetKg: 64 }, today);
+        expect(f.pace).toMatch(/^\d:\d{2}$/);
+        expect(f.pace).not.toBe('9:59');
+        // The same race, in miles, is shown per mile.
+        const imp = printFacts(form({ ...race, units: 'imperial' }), adv, { startKg: 64, targetKg: 64 }, today);
+        expect(imp.units).toBe('imperial');
+        expect(parseInt(imp.pace ?? '', 10)).toBeGreaterThan(parseInt(f.pace ?? '', 10));
+    });
+    it('prints no pace in race mode while the race result is incomplete or invalid', () => {
+        const typed = { paceMin: '5', paceSec: '0' };
+        expect(printFacts(form({ ...typed, paceSource: 'race', raceDist: '10k' }), adv, { startKg: 64, targetKg: 64 }, today).pace).toBeNull();
+        expect(printFacts(form({ ...typed, paceSource: 'race', raceDist: '10k', raceM: '1', raceS: '0' }), adv, { startKg: 64, targetKg: 64 }, today).pace).toBeNull();
+    });
     it('ignores implausible body fat and impossible paces', () => {
         expect(printFacts(form({ bodyFat: '3' }), adv, { startKg: 64, targetKg: 64 }, today).bodyFat).toBeNull();
         expect(printFacts(form({ bodyFat: '71' }), adv, { startKg: 64, targetKg: 64 }, today).bodyFat).toBeNull();

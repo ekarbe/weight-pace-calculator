@@ -1,5 +1,6 @@
 import type { AdvancedState } from './form';
 import { planByDate } from './plan';
+import { deriveRacePace } from './race-result';
 import type { FormState } from './share';
 import { kgToLb, type UnitSystem } from './units';
 
@@ -47,7 +48,7 @@ export interface PrintFacts {
     weight: number | null;
     /** Only a plausible, valid percentage. */
     bodyFat: number | null;
-    /** Threshold pace as typed, "m:ss", per km or per mile depending on `units`. */
+    /** Threshold pace, "m:ss", per km or per mile depending on `units`: as typed, or the one derived from a recent race. */
     pace: string | null;
     distance: number | null;
     /** The weight picked with the slider, and how much lighter it is than the current weight (0 for no change). */
@@ -77,8 +78,11 @@ export function printFacts(
     const unchanged = lostKg < 0.05;
 
     const bf = parseFloat(form.bodyFat);
-    const min = parseInt(form.paceMin, 10);
-    const sec = parseInt(form.paceSec, 10);
+    // In race mode the typed pace is hidden but kept, so it must not be printed; the derived pace is what the results use.
+    const fromRace = form.paceSource === 'race';
+    const racePace = fromRace ? (deriveRacePace(form).displaySec ?? NaN) : NaN;
+    const min = fromRace ? Math.floor(racePace / 60) : parseInt(form.paceMin, 10);
+    const sec = fromRace ? racePace % 60 : parseInt(form.paceSec, 10);
     const gain = parseFloat(adv.paceFactor);
     const floor = parseFloat(adv.bmiFloor);
 

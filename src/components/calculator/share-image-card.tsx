@@ -125,7 +125,7 @@ export function ShareImageCard({ rows, index, units, enteredWeight, customKm, cu
   const shown = status && status.for === built ? status.kind : null;
 
   return (
-    <section aria-labelledby={headingId} className="rounded-3xl border bg-card glassmorphism p-5 sm:p-6">
+    <section aria-labelledby={headingId} className="rounded-3xl border bg-card glassmorphism p-5 sm:p-6 print:hidden">
       <h2 id={headingId} className="flex items-center gap-2 text-sm! font-bold uppercase tracking-widest text-muted-foreground">
         <ImageDown className="h-4 w-4" aria-hidden /> {t('shareImage.heading')}
       </h2>
