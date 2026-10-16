@@ -1,6 +1,11 @@
-import type { MessageKey } from './en';
+import { raceResult } from './parts/raceResult';
+import { training } from './parts/training';
+import { band } from './parts/band';
+import { shareImage } from './parts/shareImage';
+import { print } from './parts/print';
+import type { MessageKey, enBase } from './en';
 
-export const fr: Record<MessageKey, string> = {
+const base: Record<keyof typeof enBase, string> = {
   'meta.title': 'Calculateur poids-allure',
   'meta.description': 'Estimez de combien votre allure de course pourrait s’améliorer en perdant du poids.',
   'skip': 'Aller au contenu principal',
@@ -135,4 +140,13 @@ export const fr: Record<MessageKey, string> = {
   'warn.belowFloor': 'Votre poids actuel est déjà égal ou inférieur au poids le plus bas affiché (IMC {bmi}). Perdre davantage de poids n’est généralement pas recommandé sans suivi médical.',
   'warn.disclaimerModel': 'Avertissement : ces calculs sont des estimations fondées sur des règles empiriques générales (par exemple environ {factor} s/km de gain par kg perdu, et masse maigre constante si la masse grasse est renseignée). Les résultats réels varient fortement selon la génétique, l’entraînement, l’alimentation, l’évolution de la composition corporelle et d’autres facteurs.',
   'warn.disclaimerHealth': 'La perte de poids doit se faire de manière saine. Privilégiez un changement progressif et parlez-en à un médecin ou à un diététicien avant tout changement important, en particulier si vous visez un poids corporel bas.',
+};
+
+export const fr: Record<MessageKey, string> = {
+  ...base,
+  ...raceResult.fr,
+  ...training.fr,
+  ...band.fr,
+  ...shareImage.fr,
+  ...print.fr,
 };

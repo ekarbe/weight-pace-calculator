@@ -1,3 +1,9 @@
+import { raceResult } from './parts/raceResult';
+import { training } from './parts/training';
+import { band } from './parts/band';
+import { shareImage } from './parts/shareImage';
+import { print } from './parts/print';
+
 /**
  * Source dictionary. Every other language must provide exactly these keys
  * (enforced by the type below and by src/i18n/i18n.test.ts).
@@ -5,7 +11,7 @@
  * Syntax: `{name}` is replaced by a parameter. `<b>…</b>` and `<r>…</r>` mark emphasis
  * (see `rich` in the provider). Plurals use `.one` / `.other` key pairs.
  */
-export const en = {
+const base = {
   'meta.title': 'Weight-Pace Calculator',
   'meta.description': 'Estimate running pace improvements based on weight loss.',
   'skip': 'Skip to main content',
@@ -140,6 +146,18 @@ export const en = {
   'warn.belowFloor': 'Your current weight is already at or below the lowest weight shown (BMI {bmi}). Further weight loss is generally not recommended without medical supervision.',
   'warn.disclaimerModel': 'Disclaimer: These calculations are estimates based on general rules of thumb (for example about {factor} s/km improvement per kg lost, and constant lean mass if body fat is provided). Real results vary widely with genetics, training, nutrition, changes in body composition and other factors.',
   'warn.disclaimerHealth': 'Weight loss should be approached healthily. Aim for gradual change and talk to a doctor or registered dietitian before making significant changes, especially when aiming for a low body weight.',
+} as const;
+
+export { base as enBase };
+
+/** Base messages plus one part per feature (see ./parts). */
+export const en = {
+  ...base,
+  ...raceResult.en,
+  ...training.en,
+  ...band.en,
+  ...shareImage.en,
+  ...print.en,
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -1,6 +1,11 @@
-import type { MessageKey } from './en';
+import { raceResult } from './parts/raceResult';
+import { training } from './parts/training';
+import { band } from './parts/band';
+import { shareImage } from './parts/shareImage';
+import { print } from './parts/print';
+import type { MessageKey, enBase } from './en';
 
-export const es: Record<MessageKey, string> = {
+const base: Record<keyof typeof enBase, string> = {
   'meta.title': 'Calculadora de peso y ritmo',
   'meta.description': 'Estima cuánto podría mejorar tu ritmo de carrera al perder peso.',
   'skip': 'Saltar al contenido principal',
@@ -135,4 +140,13 @@ export const es: Record<MessageKey, string> = {
   'warn.belowFloor': 'Tu peso actual ya está en el peso más bajo mostrado o por debajo (IMC {bmi}). En general no se recomienda perder más peso sin supervisión médica.',
   'warn.disclaimerModel': 'Aviso: estos cálculos son estimaciones basadas en reglas generales (por ejemplo, una mejora de unos {factor} s/km por kg perdido y masa magra constante si se indica la grasa corporal). Los resultados reales varían mucho según la genética, el entrenamiento, la alimentación, los cambios en la composición corporal y otros factores.',
   'warn.disclaimerHealth': 'La pérdida de peso debe abordarse de forma saludable. Busca un cambio gradual y habla con un médico o dietista antes de hacer cambios importantes, sobre todo si buscas un peso corporal bajo.',
+};
+
+export const es: Record<MessageKey, string> = {
+  ...base,
+  ...raceResult.es,
+  ...training.es,
+  ...band.es,
+  ...shareImage.es,
+  ...print.es,
 };

@@ -1,6 +1,11 @@
-import type { MessageKey } from './en';
+import { raceResult } from './parts/raceResult';
+import { training } from './parts/training';
+import { band } from './parts/band';
+import { shareImage } from './parts/shareImage';
+import { print } from './parts/print';
+import type { MessageKey, enBase } from './en';
 
-export const de: Record<MessageKey, string> = {
+const base: Record<keyof typeof enBase, string> = {
   'meta.title': 'Gewicht-Tempo-Rechner',
   'meta.description': 'Schätze, wie sich dein Lauftempo durch Gewichtsverlust verbessern könnte.',
   'skip': 'Zum Hauptinhalt springen',
@@ -135,4 +140,13 @@ export const de: Record<MessageKey, string> = {
   'warn.belowFloor': 'Dein aktuelles Gewicht liegt bereits auf oder unter dem niedrigsten angezeigten Gewicht (BMI {bmi}). Weiterer Gewichtsverlust wird ohne ärztliche Begleitung in der Regel nicht empfohlen.',
   'warn.disclaimerModel': 'Haftungsausschluss: Diese Berechnungen sind Schätzungen auf Basis allgemeiner Faustregeln (zum Beispiel etwa {factor} s/km Verbesserung pro verlorenem kg und gleichbleibende fettfreie Masse, wenn Körperfett angegeben ist). Die tatsächlichen Ergebnisse hängen stark von Genetik, Training, Ernährung, Veränderungen der Körperzusammensetzung und weiteren Faktoren ab.',
   'warn.disclaimerHealth': 'Gewichtsabnahme sollte gesund erfolgen. Strebe eine allmähliche Veränderung an und sprich mit einer Ärztin, einem Arzt oder einer Ernährungsberatung, bevor du größere Veränderungen vornimmst, besonders bei einem niedrigen Zielgewicht.',
+};
+
+export const de: Record<MessageKey, string> = {
+  ...base,
+  ...raceResult.de,
+  ...training.de,
+  ...band.de,
+  ...shareImage.de,
+  ...print.de,
 };
