@@ -1,7 +1,8 @@
 import { formatPace, formatTime } from './utils';
 
-const MIN_HEALTHY_BMI = 18.5;
-const PACE_IMPROVEMENT_FACTOR_SEC_PER_KG_PER_KM = 2.0;
+export const MIN_HEALTHY_BMI = 18.5;
+export const DEFAULT_TARGET_BMI_FLOOR = 20;
+export const DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM = 2.0;
 const ESSENTIAL_FAT_MALE_WARN_THRESHOLD = 5;
 const ESSENTIAL_FAT_FEMALE_WARN_THRESHOLD = 13;
 const MIN_PACE_SEC_MALE = 2 * 60 + 40;
@@ -22,6 +23,10 @@ export interface UserInput {
     bodyFatPercentage: number | null;
     thresholdPaceMin: number;
     thresholdPaceSec: number;
+    /** Seconds per km gained per kg lost. Defaults to 2. */
+    paceFactorSecPerKg?: number;
+    /** Lowest BMI the table runs down to. Defaults to 20. */
+    bmiFloor?: number;
 }
 
 export interface ResultRow {
@@ -47,10 +52,10 @@ export interface CalculationResults {
     warnings: string[];
 }
 
-export function calculateMinHealthyWeight(heightCm: number): number | null {
+export function calculateMinHealthyWeight(heightCm: number, bmi: number = MIN_HEALTHY_BMI): number | null {
     if (!heightCm || heightCm <= 0) return null;
     const heightM = heightCm / 100;
-    return MIN_HEALTHY_BMI * (heightM * heightM);
+    return bmi * (heightM * heightM);
 }
 
 function estimateRacePaceFromThreshold(thresholdPaceSecPerKm: number): { [key: string]: number } {
@@ -100,7 +105,9 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
     const essentialFatLowerBound = input.gender === 'male' ? ESSENTIAL_FAT_MALE_WARN_THRESHOLD : (input.gender === 'female' ? ESSENTIAL_FAT_FEMALE_WARN_THRESHOLD : 0);
     const minPaceSec = input.gender === 'male' ? MIN_PACE_SEC_MALE : (input.gender === 'female' ? MIN_PACE_SEC_FEMALE : MIN_PACE_SEC_FEMALE);
 
-    results.minHealthyWeightKg = input.heightCm ? calculateMinHealthyWeight(input.heightCm) : null;
+    const bmiFloor = Math.max(MIN_HEALTHY_BMI, input.bmiFloor ?? DEFAULT_TARGET_BMI_FLOOR);
+    const paceFactor = input.paceFactorSecPerKg ?? DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM;
+    results.minHealthyWeightKg = calculateMinHealthyWeight(input.heightCm, bmiFloor);
 
     let lbmKg: number | null = null;
     if (bodyFatProvided && input.bodyFatPercentage) {
@@ -146,7 +153,7 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
             }
         }
 
-        const paceImprovementSec = weightDifference * PACE_IMPROVEMENT_FACTOR_SEC_PER_KG_PER_KM;
+        const paceImprovementSec = weightDifference * paceFactor;
         const rawEstimatedPaceSec = initialThresholdPaceSec - paceImprovementSec;
 
         if (rawEstimatedPaceSec <= 0) {
@@ -198,9 +205,9 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
         results.warnings.push(`Estimated threshold pace has been capped at the minimum defined limit (${formatPace(minPaceSec)} min/km for ${input.gender}) for some weights.`);
     }
     if (results.minHealthyWeightKg && input.weightKg <= results.minHealthyWeightKg) {
-        results.warnings.push("Your current weight is already at or below the calculated minimum healthy weight (BMI 18.5). Further weight loss is generally not recommended without medical supervision.");
+        results.warnings.push(`Your current weight is already at or below the lowest weight shown (BMI ${bmiFloor}). Further weight loss is generally not recommended without medical supervision.`);
     }
-    results.warnings.push("Disclaimer: These calculations are estimations based on general physiological principles and rules of thumb (e.g., ~2 sec/km improvement per kg lost, constant lean mass if BF% provided). Actual results vary significantly based on individual genetics, training adaptations, nutrition, body composition changes, and other factors.");
+    results.warnings.push(`Disclaimer: These calculations are estimations based on general physiological principles and rules of thumb (e.g., ~${paceFactor} sec/km improvement per kg lost, constant lean mass if BF% provided). Actual results vary significantly based on individual genetics, training adaptations, nutrition, body composition changes, and other factors.`);
     results.warnings.push("Weight loss should be approached healthily. Aim for gradual loss and consult with healthcare professionals or registered dietitians before making significant changes, especially when aiming for low body weight.");
 
 

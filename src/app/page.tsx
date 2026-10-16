@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { cn } from "@/lib/utils";
 import { Header } from '@/components/ui/header';
 import { Footer } from '@/components/ui/footer';
@@ -29,12 +29,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Info, AlertTriangle, Link2, HeartPulse } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
-import { UserInput, CalculationResults, calculateWeightPaceEstimates } from '@/lib/calculations';
+import { UserInput, CalculationResults, calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DEFAULT_TARGET_BMI_FLOOR } from '@/lib/calculations';
+import { UnitSystem, unitLabels, kgToLb, lbToKg, cmToIn, inToCm, secPerKmToSecPerMile, secPerMileToSecPerKm } from '@/lib/units';
+import { decodeForm, encodeForm } from '@/lib/share';
+import { formatPace } from '@/lib/utils';
 
 export default function HomePage() {
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
@@ -44,10 +47,57 @@ export default function HomePage() {
   const [thresholdPaceMin, setThresholdPaceMin] = useState<string>('');
   const [thresholdPaceSec, setThresholdPaceSec] = useState<string>('');
 
+  const [units, setUnits] = useState<UnitSystem>('metric');
+  const [paceFactor, setPaceFactor] = useState<string>(String(DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM));
+  const [bmiFloor, setBmiFloor] = useState<string>(String(DEFAULT_TARGET_BMI_FLOOR));
+  const [copied, setCopied] = useState(false);
+  const labels = unitLabels(units);
+  const fmtWeight = (kg: number) => (units === 'metric' ? kg : kgToLb(kg)).toFixed(1);
+  const fmtPace = (secPerKm: number | null) => secPerKm === null ? 'N/A' : formatPace(units === 'metric' ? secPerKm : secPerKmToSecPerMile(secPerKm));
+
   const [results, setResults] = useState<CalculationResults | null>(null);
   const [showResults, setShowResults] = useState<boolean>(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const f = decodeForm(window.location.search);
+    if (!f.height && !f.weight && !f.paceMin && !f.gender) return;
+    // One-time hydration from the URL; can't use lazy initial state because the page is statically exported.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setUnits(f.units); setGender(f.gender); setHeightCm(f.height); setWeightKg(f.weight);
+    setBodyFatPercentage(f.bodyFat); setThresholdPaceMin(f.paceMin); setThresholdPaceSec(f.paceSec);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  const convertField = (v: string, fn: (n: number) => number) => {
+    const n = parseFloat(v);
+    return isNaN(n) ? v : String(Math.round(fn(n) * 10) / 10);
+  };
+
+  const switchUnits = (next: UnitSystem) => {
+    if (next === units) return;
+    const toImp = next === 'imperial';
+    setHeightCm((v) => convertField(v, toImp ? cmToIn : inToCm));
+    setWeightKg((v) => convertField(v, toImp ? kgToLb : lbToKg));
+    const min = parseInt(thresholdPaceMin, 10), sec = parseInt(thresholdPaceSec, 10);
+    if (!isNaN(min) && !isNaN(sec)) {
+      const total = min * 60 + sec;
+      const conv = Math.round(toImp ? secPerKmToSecPerMile(total) : secPerMileToSecPerKm(total));
+      setThresholdPaceMin(String(Math.floor(conv / 60)));
+      setThresholdPaceSec(String(conv % 60));
+    }
+    setUnits(next);
+    setResults(null);
+    setShowResults(false);
+  };
+
+  const copyShareLink = async () => {
+    const q = encodeForm({ units, gender, height: heightCm, weight: weightKg, bodyFat: bodyFatPercentage, paceMin: thresholdPaceMin, paceSec: thresholdPaceSec });
+    const url = `${window.location.origin}${window.location.pathname}${q ? `?${q}` : ''}`;
+    window.history.replaceState(null, '', url);
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard unavailable */ }
+  };
 
   const isValidInput = useMemo(() => {
     return (
@@ -64,8 +114,13 @@ export default function HomePage() {
   const handleCalculate = () => {
     const currentErrors: Record<string, string> = {};
     if (!gender) currentErrors.gender = 'Required';
-    if (!heightCm || parseFloat(heightCm) <= 50) currentErrors.height = 'Enter valid height (>50 cm)';
-    if (!weightKg || parseFloat(weightKg) <= 20) currentErrors.weight = 'Enter valid weight (>20 kg)';
+    const heightMetric = units === 'metric' ? parseFloat(heightCm) : inToCm(parseFloat(heightCm));
+    const weightMetric = units === 'metric' ? parseFloat(weightKg) : lbToKg(parseFloat(weightKg));
+    if (!heightCm || !(heightMetric > 50)) currentErrors.height = 'Enter a valid height (> 50 cm / 20 in)';
+    if (!weightKg || !(weightMetric > 20)) currentErrors.weight = 'Enter a valid weight (> 20 kg / 45 lb)';
+    const pf = parseFloat(paceFactor), bf = parseFloat(bmiFloor);
+    if (isNaN(pf) || pf < 0 || pf > 5) currentErrors.advanced = 'Pace factor must be 0-5 s/km per kg';
+    if (isNaN(bf) || bf < 18.5 || bf > 30) currentErrors.advanced = 'BMI floor must be 18.5-30';
     const bfpValue = bodyFatPercentage.trim();
     if (bfpValue && (parseFloat(bfpValue) < 5 || parseFloat(bfpValue) > 70)) {
       currentErrors.bfp = 'If entered, use 5-70%';
@@ -87,11 +142,16 @@ export default function HomePage() {
 
     const userInput: UserInput = {
       gender: gender as 'male' | 'female',
-      heightCm: parseFloat(heightCm),
-      weightKg: parseFloat(weightKg),
+      heightCm: heightMetric,
+      weightKg: weightMetric,
       bodyFatPercentage: bodyFatPercentage.trim() && !currentErrors.bfp ? parseFloat(bodyFatPercentage) : null,
-      thresholdPaceMin: parseInt(thresholdPaceMin, 10),
-      thresholdPaceSec: parseInt(thresholdPaceSec, 10),
+      ...(() => {
+        const total = parseInt(thresholdPaceMin, 10) * 60 + parseInt(thresholdPaceSec, 10);
+        const perKm = units === 'metric' ? total : Math.round(secPerMileToSecPerKm(total));
+        return { thresholdPaceMin: Math.floor(perKm / 60), thresholdPaceSec: perKm % 60 };
+      })(),
+      paceFactorSecPerKg: pf,
+      bmiFloor: bf,
     };
     const calculatedData = calculateWeightPaceEstimates(userInput);
     setResults(calculatedData);
@@ -112,6 +172,13 @@ export default function HomePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div role="group" aria-label="Units" className="grid grid-cols-2 gap-1 rounded-md border p-1">
+                  {(['metric', 'imperial'] as const).map((u) => (
+                    <Button key={u} type="button" size="sm" variant={units === u ? 'default' : 'ghost'} aria-pressed={units === u} onClick={() => switchUnits(u)}>
+                      {u === 'metric' ? 'kg · cm · km' : 'lb · in · mi'}
+                    </Button>
+                  ))}
+                </div>
                 <div>
                   <Label htmlFor="gender">Biological Gender</Label>
                   <Select value={gender} onValueChange={(value) => setGender(value as 'male' | 'female' | '')}>
@@ -127,11 +194,11 @@ export default function HomePage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="height">Height (cm)</Label>
+                  <Label htmlFor="height">Height ({labels.height})</Label>
                   <Input
                     id="height"
                     type="number"
-                    placeholder="e.g., 180"
+                    placeholder={units === 'metric' ? 'e.g., 180' : 'e.g., 71'}
                     value={heightCm}
                     onChange={(e) => setHeightCm(e.target.value)}
                     min="50"
@@ -142,11 +209,11 @@ export default function HomePage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="weight">Current Weight (kg)</Label>
+                  <Label htmlFor="weight">Current Weight ({labels.weight})</Label>
                   <Input
                     id="weight"
                     type="number"
-                    placeholder="e.g., 75.5"
+                    placeholder={units === 'metric' ? 'e.g., 75.5' : 'e.g., 166'}
                     value={weightKg}
                     onChange={(e) => setWeightKg(e.target.value)}
                     min="20"
@@ -173,7 +240,7 @@ export default function HomePage() {
                 </div>
 
                 <div>
-                  <Label>Threshold Pace (min/km)</Label>
+                  <Label>Threshold Pace ({labels.pace})</Label>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -211,12 +278,31 @@ export default function HomePage() {
                   {errors.pace && <p className="text-destructive text-xs mt-1">{errors.pace}</p>}
                 </div>
 
+                <details className="rounded-md border p-3 text-sm">
+                  <summary className="cursor-pointer font-medium">Advanced assumptions</summary>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <Label htmlFor="pace-factor">Pace gain (s/km per kg lost)</Label>
+                      <Input id="pace-factor" type="number" min="0" max="5" step="0.1" value={paceFactor} onChange={(e) => setPaceFactor(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="bmi-floor">Lowest BMI to show</Label>
+                      <Input id="bmi-floor" type="number" min="18.5" max="30" step="0.5" value={bmiFloor} onChange={(e) => setBmiFloor(e.target.value)} />
+                      <p className="text-xs text-muted-foreground mt-1">Never below 18.5 (the WHO underweight threshold).</p>
+                    </div>
+                    {errors.advanced && <p className="text-destructive text-xs">{errors.advanced}</p>}
+                  </div>
+                </details>
+
                 <Button
                   onClick={handleCalculate}
                   className="w-full"
-                  disabled={!isValidInput} // <--- Add this line
+                  disabled={!isValidInput}
                 >
                   Calculate Estimates
+                </Button>
+                <Button type="button" variant="outline" className="w-full" onClick={copyShareLink} disabled={!heightCm && !weightKg}>
+                  <Link2 className="w-4 h-4 mr-2" /> {copied ? 'Link copied!' : 'Copy share link'}
                 </Button>
               </CardContent>
             </Card>
@@ -225,13 +311,19 @@ export default function HomePage() {
           <div className="md:col-span-2">
             {showResults && results && (
               <div className="space-y-6">
+                <Alert>
+                  <HeartPulse className="h-4 w-4" />
+                  <AlertTitle>Read this first</AlertTitle>
+                  <AlertDescription>
+                    These are rough estimates, not a weight-loss plan. Faster running from lower weight only holds if you stay healthy and well fuelled. Don&apos;t aim below a healthy weight for your height, and talk to a doctor or dietitian before changing your weight.
+                  </AlertDescription>
+                </Alert>
                 {results.minHealthyWeightKg && (
                   <Alert>
                     <Info className="h-4 w-4" />
                     <AlertTitle>Info</AlertTitle>
                     <AlertDescription>
-                      Estimated minimum healthy weight (BMI {18.5}) for your height: <strong>{results.minHealthyWeightKg.toFixed(1)} kg</strong>.
-                      The table below shows estimates down to this weight.
+                      The table runs down to BMI {bmiFloor}, i.e. <strong>{fmtWeight(results.minHealthyWeightKg)} {labels.weight}</strong> for your height.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -248,9 +340,9 @@ export default function HomePage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="text-center">Target Wt (kg)</TableHead>
+                            <TableHead className="text-center">Target Wt ({labels.weight})</TableHead>
                             <TableHead className="text-center">Est. BF (%)</TableHead>
-                            <TableHead className="text-center">Est. Thr. Pace</TableHead>
+                            <TableHead className="text-center">Est. Thr. Pace ({labels.pace})</TableHead>
                             <TableHead className="text-center">Est. 5K Time</TableHead>
                             <TableHead className="text-center">Est. 10K Time</TableHead>
                             <TableHead className="text-center">Est. HM Time</TableHead>
@@ -263,7 +355,7 @@ export default function HomePage() {
                               key={index}
                               className={cn(row.isPotentiallyUnhealthyFat ? "text-destructive" : "")}
                             >
-                              <TableCell className="text-center font-medium">{row.targetWeightKg.toFixed(1)}</TableCell>
+                              <TableCell className="text-center font-medium">{index === 0 && weightKg ? parseFloat(weightKg).toFixed(1) : fmtWeight(row.targetWeightKg)}</TableCell>
                               <TableCell className="text-center">
                                 {row.estimatedBodyFatPercentage !== null ? row.estimatedBodyFatPercentage.toFixed(1) : 'N/A'}
                                 {row.isPotentiallyUnhealthyFat && row.estimatedBodyFatPercentage !== null && (
@@ -271,7 +363,7 @@ export default function HomePage() {
                                 )}
                               </TableCell>
                               <TableCell className="text-center">
-                                {row.estimatedThresholdPaceFormatted}
+                                {fmtPace(row.estimatedThresholdPaceSec)}
                                 {row.paceLimited && <TooltipProvider><Tooltip><TooltipTrigger asChild><Info className='w-3 h-3 inline-block ml-1 text-blue-500' /></TooltipTrigger><TooltipContent><p>Pace improvement capped</p></TooltipContent></Tooltip></TooltipProvider>}
                               </TableCell>
                               <TableCell className="text-center">{row.estimated5kTimeFormatted}</TableCell>
