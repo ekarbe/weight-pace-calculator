@@ -18,16 +18,18 @@ export function parsePaceToSeconds(pace: string): number | null {
 
 export function formatPace(totalSeconds: number): string {
   if (totalSeconds < 0) totalSeconds = 0;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.round(totalSeconds % 60);
+  const rounded = Math.round(totalSeconds);
+  const minutes = Math.floor(rounded / 60);
+  const seconds = rounded % 60;
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
 export function formatTime(totalSeconds: number): string {
   if (totalSeconds < 0) totalSeconds = 0;
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = Math.round(totalSeconds % 60);
+  const rounded = Math.round(totalSeconds);
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const seconds = rounded % 60;
 
   const paddedMinutes = minutes < 10 ? `0${minutes}` : `${minutes}`;
   const paddedSeconds = seconds < 10 ? `0${seconds}` : `${seconds}`;

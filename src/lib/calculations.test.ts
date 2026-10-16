@@ -20,11 +20,21 @@ describe('calculateMinHealthyWeight', () => {
 });
 
 describe('calculateWeightPaceEstimates', () => {
-    it('starts at current weight with the entered pace and ends at min healthy weight', () => {
+    it('starts at current weight with the entered pace and ends at the BMI-20 floor', () => {
         const r = calculateWeightPaceEstimates(base);
         expect(r.resultsTable[0].targetWeightKg).toBe(80);
         expect(r.resultsTable[0].estimatedThresholdPaceSec).toBe(270);
-        expect(r.resultsTable.at(-1)!.targetWeightKg).toBeCloseTo(59.9, 1);
+        expect(r.resultsTable.at(-1)!.targetWeightKg).toBeCloseTo(64.8, 1);
+    });
+    it('lets the user lower the floor to BMI 18.5 but not below', () => {
+        const low = calculateWeightPaceEstimates({ ...base, bmiFloor: 18.5 }).resultsTable.at(-1)!.targetWeightKg;
+        const lower = calculateWeightPaceEstimates({ ...base, bmiFloor: 15 }).resultsTable.at(-1)!.targetWeightKg;
+        expect(low).toBeCloseTo(59.9, 1);
+        expect(lower).toBeCloseTo(59.9, 1);
+    });
+    it('honours a custom pace factor', () => {
+        const rows = calculateWeightPaceEstimates({ ...base, paceFactorSecPerKg: 1 }).resultsTable;
+        expect(rows[2].estimatedThresholdPaceSec).toBe(269);
     });
     it('steps by 0.5 kg without float drift', () => {
         const w = calculateWeightPaceEstimates(base).resultsTable.map(x => x.targetWeightKg);
