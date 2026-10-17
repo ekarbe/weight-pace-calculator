@@ -119,11 +119,9 @@ test.describe('keyboard only', () => {
     expect(offscreen, 'focused controls that were not scrolled into view').toEqual([]);
   });
 
-  // Known defect, reported with this suite (WCAG 2.2 SC 2.4.11, not part of 2.1 AA): Tab can scroll a control just
-  // under the 64px sticky header, e.g. the target weight slider. A `scroll-padding-top` on <html> fixes it; remove
-  // the annotation when it does, the test then passes and the annotation would fail the run.
+  // WCAG 2.2 SC 2.4.11 (not part of 2.1 AA): Tab used to scroll a control just under the 64px sticky header, e.g. the
+  // target weight slider. `scroll-padding-top` on <html> keeps it clear.
   test('a focused control is never hidden behind the sticky header', async ({ page }) => {
-    test.fail(true, 'the sticky header covers the focused target-weight slider after Tab');
     await openApp(page, { params: FULL, results: true });
     const inventory = await markTabbable(page);
     const visited = await tabThrough(page, inventory.length);

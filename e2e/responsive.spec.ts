@@ -17,7 +17,29 @@ function elementsPastTheEdge(page: Page): Promise<string[]> {
   });
 }
 
+/**
+ * The big time on each race card, when it is wider than its card. The card clips what sticks out (it has overflow-hidden for
+ * its stripe), so this is invisible to the viewport-edge check above: 03:47:26 used to lose its last digits at 1024-1279 px.
+ */
+function clippedTimes(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('ul > li p.font-black')]
+      .filter((p) => p.scrollWidth > p.clientWidth)
+      .map((p) => `${p.textContent} (${p.scrollWidth}px in ${p.clientWidth}px)`),
+  );
+}
+
 test.describe('layout at every width', () => {
+  for (const width of [1024, 1100, 1180, 1279, 1280]) {
+    // Desktop project only (a window width, not a phone); the phone project has its own 320 px check below.
+    test(`the times on the race cards are not cut off at ${width} px`, { tag: '@desktop' }, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openApp(page, { params: SAMPLE, results: true });
+      await expect(page.getByRole('listitem').filter({ hasText: /^Marathon:/ })).toBeVisible();
+      expect(await clippedTimes(page)).toEqual([]);
+    });
+  }
+
   for (const lang of LOCALES) {
     test(`${lang}: nothing overflows horizontally with every feature and section open`, async ({ page }) => {
       await openApp(page, { lang, params: FULL, results: true });
@@ -53,6 +75,10 @@ test.describe('layout at every width', () => {
 // Phone project only (a 320px viewport is a phone; see playwright.config.ts).
 test.describe('narrow screens (WCAG 1.4.10 reflow, 320 CSS px)', { tag: '@phone' }, () => {
   test.use({ viewport: { width: 320, height: 640 } });
+  test('the times on the race cards are not cut off', async ({ page }) => {
+    await openApp(page, { params: SAMPLE, results: true });
+    expect(await clippedTimes(page)).toEqual([]);
+  });
   for (const lang of LOCALES) {
     test(`${lang}: content reflows into one column without horizontal scrolling`, async ({ page }) => {
       await openApp(page, { lang, params: FULL, results: true });

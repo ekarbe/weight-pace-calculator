@@ -1,5 +1,5 @@
 import { test, expect } from './support/fixtures';
-import { form, openApp, tr, waitForHydration } from './support/app';
+import { LOCALES, form, openApp, tr, waitForHydration } from './support/app';
 
 test.describe('language selection', () => {
   test('?lang= wins, and the switcher changes the page, keeps the form, and is remembered', async ({ page }) => {
@@ -71,35 +71,39 @@ test.describe('theme', () => {
   });
 
   test.describe('light system preference', () => {
-    test('the toggle reaches dark after two clicks', async ({ page }) => {
+    test('the toggle goes to dark and back', async ({ page }) => {
       await openApp(page);
       const html = page.locator('html');
       await expect(html).toHaveClass(/light/);
       await page.getByRole('button', { name: 'Toggle theme' }).click();
-      await page.getByRole('button', { name: 'Toggle theme' }).click();
       await expect(html).toHaveClass(/dark/);
+      await page.getByRole('button', { name: 'Toggle theme' }).click();
+      await expect(html).toHaveClass(/light/);
     });
 
-    // Known defect, reported with this suite: while the theme is still "system", the first click sets "light" when
-    // the system is already light, so nothing visible happens. Remove the annotation once the toggle uses the
-    // resolved theme; the test then passes and the annotation would fail the run.
+    // While the stored theme is still "system", the toggle leaves the theme that is on screen, whichever it is.
     test('the first click on the toggle switches to dark', async ({ page }) => {
-      test.fail(true, 'theme toggle: first click is a no-op while the theme is "system" and the system is light');
       await openApp(page);
       await page.getByRole('button', { name: 'Toggle theme' }).click();
-      await expect(page.locator('html')).toHaveClass(/dark/, { timeout: 1500 });
+      await expect(page.locator('html')).toHaveClass(/dark/);
     });
   });
 });
 
 test.describe('document head', () => {
-  // Known defect, reported with this suite: opening the page with ?lang=de (or es, fr) leaves a second, English
-  // <meta name="description"> next to the translated one. Remove the annotation once there is exactly one.
-  test('has a single, translated description', async ({ page }) => {
-    test.fail(true, 'duplicate <meta name="description"> when the page opens in a non-default language');
-    await openApp(page, { lang: 'de' });
-    await expect(page.locator('meta[name="description"]')).toHaveCount(1, { timeout: 1500 });
-  });
+  for (const lang of LOCALES) {
+    test(`${lang}: has a single description, in the page language, that follows the language switcher`, async ({ page }) => {
+      await openApp(page, { lang });
+      const description = page.locator('meta[name="description"]');
+      await expect(description).toHaveCount(1);
+      await expect(description).toHaveAttribute('content', tr(lang, 'meta.description'));
+      const other = LOCALES.find((l) => l !== lang)!;
+      await page.getByLabel(tr(lang, 'lang.label')).selectOption(other);
+      await expect(page.locator('html')).toHaveAttribute('lang', other);
+      await expect(description).toHaveCount(1);
+      await expect(description).toHaveAttribute('content', tr(other, 'meta.description'));
+    });
+  }
 });
 
 test.describe('static export', () => {

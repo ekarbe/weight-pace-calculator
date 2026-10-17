@@ -73,6 +73,8 @@ export default defineConfig({
         hasTouch: true,
       },
       testMatch: ['smoke.spec.ts', 'a11y.spec.ts', 'responsive.spec.ts', 'touch.spec.ts'],
+      // Window-width checks (1024-1280 px) belong to the desktop project.
+      grepInvert: /@desktop/,
     },
   ],
   webServer: {

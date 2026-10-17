@@ -79,6 +79,19 @@ test.describe('race cards', () => {
     await expect(page.getByRole('listitem').filter({ hasText: /Your distance/ })).toHaveCount(0);
   });
 
+  for (const [lang, comma] of [['de', true], ['es', true], ['fr', true], ['en', false]] as const) {
+    test(`${lang}: a fractional custom distance is written like every other number, on the card, in the chart tab and in the image text`, async ({ page }) => {
+      await openApp(page, { lang, params: { u: 'imperial', g: 'female', h: '67', w: '141', pm: '8', ps: '3', d: '9.3' }, results: true });
+      const label = comma ? '9,3 mi' : '9.3 mi';
+      // (French puts a space before the colon, so the card is found by its label alone.)
+      await expect(page.getByRole('listitem').filter({ hasText: new RegExp(`^${label}\\s*:`) })).toBeVisible();
+      await expect(page.getByRole('button', { name: label })).toBeVisible();
+      const alt = (await page.locator('canvas[role="img"]').getAttribute('aria-label')) ?? '';
+      expect(alt).toMatch(new RegExp(`${label}\\s*:`));
+      expect(alt).not.toContain(comma ? '9.3 mi' : '9,3 mi');
+    });
+  }
+
   test('in imperial the custom distance is in miles', async ({ page }) => {
     await openApp(page, { params: { u: 'imperial', g: 'female', h: '67', w: '141', pm: '8', ps: '3', d: '5' }, results: true });
     await expect(raceCard(page, '5 mi')).toBeVisible();

@@ -3,25 +3,9 @@ import { test, expect } from './support/fixtures';
 import { MODAL_POPUP_RULES, expectNoAxeViolations, type AxeOptions } from './support/axe';
 import { DATE_BRISK, DATE_TOO_FAST, LOCALES, SAMPLE, brokenAriaReferences, disableMotion, fillSample, form, inEachTheme, openAllDetails, openApp, slider, tr } from './support/app';
 
-/**
- * Known defects (reported with this suite, not fixed by it):
- *  - In the light theme `text-destructive` (#ff3b30) is about 3.5:1 on the card background. It is used for the
- *    "Too fast" label of the timeline, table rows below healthy body fat, the red warning box under the slider, the
- *    field errors of the input panel and the "pick a date in the future" message, all of which fail WCAG 1.4.3.
- *    (The race-result and training fields already use text-red-700 in the light theme, which passes.)
- *  - The "What is threshold pace?" tooltip paints grey paragraph text (the global `p` colour) on its green
- *    background in both themes, about 2.4:1.
- * The scans below leave the light-theme `.text-destructive` elements out; the `test.fail` tests at the bottom assert
- * the fixed behaviour, so they start failing the run once the defects are fixed, and the exclusions can go.
- */
-const KNOWN_LIGHT_CONTRAST_DEFECTS = ['.text-destructive'];
-
 const FULL = { ...SAMPLE, td: DATE_BRISK, wk: '40', th: 'some' };
 
-/**
- * Every state of the Training context card: [name, share-link parameters, steps that need the UI]. Each is scanned
- * within the card (it uses no destructive colour, so the light-theme defect above does not apply to it).
- */
+/** Every state of the Training context card: [name, share-link parameters, steps that need the UI]. Each is scanned within the card. */
 const TRAINING_STATES: [string, Record<string, string>, ((page: Page) => Promise<void>)?][] = [
   ['idle (nothing to compare)', SAMPLE, async (page) => { await slider(page).focus(); await page.keyboard.press('Home'); }],
   ['idle (a change within day-to-day swings)', SAMPLE, async (page) => { await slider(page).focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight'); }],
@@ -42,13 +26,9 @@ const TRAINING_STATES: [string, Record<string, string>, ((page: Page) => Promise
 test.describe('axe (WCAG 2.1 AA) in other states, light and dark', () => {
   test.beforeEach(({ page }) => disableMotion(page));
 
-  /** Scans the current page in both themes; `lightExclude` is left out of the light-theme scan only (known defects). */
-  const scanBothThemes = (page: Page, opts: AxeOptions & { lightExclude?: string[] } = {}) => {
-    const { lightExclude = [], ...axe } = opts;
-    return inEachTheme(page, (scheme) =>
-      expectNoAxeViolations(page, { ...axe, exclude: [...(axe.exclude ?? []), ...(scheme === 'light' ? lightExclude : [])], label: `${scheme} theme` }),
-    );
-  };
+  /** Scans the current page in both themes. */
+  const scanBothThemes = (page: Page, opts: AxeOptions = {}) =>
+    inEachTheme(page, (scheme) => expectNoAxeViolations(page, { ...opts, label: `${scheme} theme` }));
 
   test('empty form', async ({ page }) => {
     await openApp(page);
@@ -63,7 +43,7 @@ test.describe('axe (WCAG 2.1 AA) in other states, light and dark', () => {
     await f.advanced.click();
     await f.paceGain.fill('9');
     await expect(page.getByRole('alert').filter({ hasText: 'Enter 50–272 cm' })).toBeVisible();
-    await scanBothThemes(page, { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS });
+    await scanBothThemes(page);
     expect(await brokenAriaReferences(page)).toEqual([]);
   });
 
@@ -82,7 +62,7 @@ test.describe('axe (WCAG 2.1 AA) in other states, light and dark', () => {
     await openApp(page, { params: { ...FULL, td: DATE_TOO_FAST }, results: true });
     await expect(page.getByRole('status').filter({ hasText: 'No estimate shown' })).toBeVisible();
     await openAllDetails(page);
-    await scanBothThemes(page, { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS });
+    await scanBothThemes(page);
   });
 
   test('body fat below healthy levels (warnings, flagged rows, no share image)', async ({ page }) => {
@@ -91,7 +71,7 @@ test.describe('axe (WCAG 2.1 AA) in other states, light and dark', () => {
     await page.keyboard.press('End');
     await expect(page.getByText('No image for this target weight')).toBeVisible();
     await openAllDetails(page);
-    await scanBothThemes(page, { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS });
+    await scanBothThemes(page);
   });
 
   test('capped pace warning in imperial units', async ({ page }) => {
@@ -100,7 +80,7 @@ test.describe('axe (WCAG 2.1 AA) in other states, light and dark', () => {
     await page.keyboard.press('End');
     await expect(page.getByText('Pace is capped at the model’s limit here')).toBeVisible();
     await openAllDetails(page);
-    await scanBothThemes(page, { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS });
+    await scanBothThemes(page);
   });
 
   for (const [name, params, steps] of TRAINING_STATES) {
@@ -123,7 +103,7 @@ test.describe('axe (WCAG 2.1 AA) in other states, light and dark', () => {
         await openApp(page, { lang, params, results: true });
         await openAllDetails(page);
         // The card is what changes between the states; the whole page is scanned once, for the first state.
-        await scanBothThemes(page, name === 'lowered' ? { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS } : { include: ['section#training'] });
+        await scanBothThemes(page, name === 'lowered' ? {} : { include: ['section#training'] });
         expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
       });
     }
@@ -150,8 +130,8 @@ test.describe('axe (WCAG 2.1 AA) in other states, light and dark', () => {
     await openApp(page, { params: FULL, results: true });
     await page.getByRole('button', { name: 'What is threshold pace?' }).focus();
     await expect(page.getByRole('tooltip').first()).toBeVisible();
-    // The tooltip text itself is a reported defect (below); it is portalled outside the landmarks by design.
-    await scanBothThemes(page, { exclude: ['[role="tooltip"]'] });
+    // The tooltip is portalled outside the landmarks by design, so the landmark rule does not apply to it.
+    await scanBothThemes(page, { disableRules: ['region'] });
   });
 });
 
@@ -217,45 +197,47 @@ test.describe('motion', () => {
   });
 });
 
-test.describe('known contrast defects in the light theme', () => {
+// The red used for text (errors, "Too fast", flagged rows, the warning box) has its own dark-on-light ink: the plain
+// destructive red is only 3.5:1 on the light card. These check the elements directly, in the light theme where it matters.
+test.describe('red text in the light theme', () => {
   test.use({ colorScheme: 'light' });
   test.beforeEach(({ page }) => disableMotion(page));
 
-  const contrastOfDestructiveText = (page: Page) => expectNoAxeViolations(page, { include: ['.text-destructive'], rules: ['color-contrast'] });
+  const contrastOfRedText = (page: Page) => expectNoAxeViolations(page, { include: ['.text-destructive-ink'], rules: ['color-contrast'] });
 
   test('the "Too fast" risk label has enough contrast', async ({ page }) => {
-    test.fail(true, 'timeline risk label uses text-destructive, about 3.5:1 on the light card');
     await openApp(page, { params: { ...SAMPLE, td: DATE_TOO_FAST }, results: true });
     await expect(page.getByText('Too fast').first()).toBeVisible();
-    await contrastOfDestructiveText(page);
+    await contrastOfRedText(page);
   });
 
   test('flagged table rows and the warning box under the slider have enough contrast', async ({ page }) => {
-    test.fail(true, 'flagged rows and the warning box use text-destructive, about 3.5:1 on the light card');
     await openApp(page, { params: { g: 'male', h: '180', w: '75', bf: '10', pm: '4', ps: '0' }, results: true });
     await slider(page).focus();
     await page.keyboard.press('End');
     await expect(page.getByText('Estimated body fat at this weight is below healthy levels.')).toBeVisible();
     await openAllDetails(page);
-    await contrastOfDestructiveText(page);
+    await contrastOfRedText(page);
   });
 
-  test('the input panel\'s field errors have enough contrast', async ({ page }) => {
-    test.fail(true, 'field errors use text-destructive, about 3.5:1 on the light card');
+  test('the input panel\'s field errors and the past-date message have enough contrast', async ({ page }) => {
     await openApp(page);
     await fillSample(page, { height: '20' });
     await expect(page.getByRole('alert').filter({ hasText: 'Enter 50–272 cm' })).toBeVisible();
-    await contrastOfDestructiveText(page);
+    await contrastOfRedText(page);
+    await page.getByLabel('Height (cm)').fill('170');
+    await page.getByLabel(/^I want to get there by/).fill('2026-06-01');
+    await expect(page.getByRole('alert').filter({ hasText: 'Pick a date in the future.' })).toBeVisible();
+    await contrastOfRedText(page);
   });
 });
 
 for (const scheme of ['light', 'dark'] as const) {
-  test.describe(`known contrast defect: tooltip, ${scheme}`, () => {
+  test.describe(`tooltip, ${scheme} theme`, () => {
     test.use({ colorScheme: scheme });
     test.beforeEach(({ page }) => disableMotion(page));
 
     test('the "What is threshold pace?" tooltip text has enough contrast', async ({ page }) => {
-      test.fail(true, 'tooltip paragraph inherits the global muted p colour on the green tooltip background, about 2.4:1');
       await openApp(page, { params: SAMPLE, results: true });
       await page.getByRole('button', { name: 'What is threshold pace?' }).focus();
       await expect(page.getByRole('tooltip').first()).toBeVisible();
@@ -263,3 +245,32 @@ for (const scheme of ['light', 'dark'] as const) {
     });
   });
 }
+
+// Windows High Contrast and other forced-colour modes replace author backgrounds. A selected segment that is shown by a
+// fill alone, and a button without a border, would then look like the others, or like plain text.
+test.describe('forced colours', () => {
+  test.beforeEach(({ page }) => disableMotion(page));
+
+  test('the pressed segments and the borderless buttons stay distinguishable', async ({ page }) => {
+    await page.emulateMedia({ forcedColors: 'active' });
+    await openApp(page, { params: { ...SAMPLE, pace: 'race', rd: '5k', rtm: '25', rts: '0' }, results: true });
+    const look = (locator: ReturnType<Page['locator']>) =>
+      locator.evaluate((el) => {
+        const c = getComputedStyle(el);
+        return { background: c.backgroundColor, border: c.borderTopWidth, adjust: c.forcedColorAdjust };
+      });
+    const pressed = await look(form(page).paceSource('From a recent race'));
+    const other = await look(form(page).paceSource('Threshold pace'));
+    // The pressed state opts out of the forced palette and paints Highlight; the others keep the forced colours.
+    expect(pressed.adjust).toBe('none');
+    expect(other.adjust).not.toBe('none');
+    expect(pressed.background).not.toBe(other.background);
+    const units = await look(form(page).units('kg · cm · km'));
+    const imperial = await look(form(page).units('lb · in · mi'));
+    expect(units.background).not.toBe(imperial.background);
+    const chart = page.getByRole('group', { name: 'Chart metric' });
+    expect(await look(chart.getByRole('button', { name: '10K', exact: true }))).not.toEqual(await look(chart.getByRole('button', { name: '5K', exact: true })));
+    // A filled button has no border of its own; in forced colours it gets one.
+    expect(parseFloat((await look(page.getByRole('button', { name: 'Save image' }))).border)).toBeGreaterThan(0);
+  });
+});

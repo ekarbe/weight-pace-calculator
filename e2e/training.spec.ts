@@ -17,6 +17,9 @@ const SIGNS = 'Constant tiredness, repeated illness or injury, or changes in sle
 const SCOPE = 'This card is written for adults. If you are under 18, pregnant, unwell or returning from injury, ask a doctor before relying on any weight-change figure.';
 const BRISK_REASON = 'A brisk pace of weight change is harder to combine with good training, so the estimate is lowered.';
 const SHARE_BLOCKED = 'No image for this scenario: the Training context card shows no estimate for it.';
+const SHARE_LOWERED = 'No image for this scenario: the Training context card lowers the estimate for it, and an image would show the higher headline figure.';
+const CAVEAT = 'This card looks only at the pace of weight change and your weekly running, and it can lower an estimate or hold it back, never raise it. Its limits are rules of thumb, not measurements, and have not been checked against outcomes. This is general information, not medical or coaching advice.';
+const NOT_LOWERED = 'Estimate not lowered';
 
 /** The card's text without the closed explainer, which legitimately talks about s/km and thresholds. */
 const visibleText = (page: Page) =>
@@ -41,10 +44,25 @@ test.describe('training context card: states', () => {
     await slider(page).focus();
     await page.keyboard.press('Home');
     await expect(card(page)).toContainText('This card sets the weight-based estimate against how you train once the selected weight is below your current weight.');
-    await expect(state(page)).toHaveCount(0);
+    await expect(state(page)).toHaveText('');
     await expect(weeklyKm(page)).toHaveCount(0);
     await expect(card(page)).not.toContainText(SCOPE);
     await expect(pointer(page)).toHaveCount(0);
+  });
+
+  test('the status line is one live region that stays in the page, so a change of state is announced', async ({ page }) => {
+    await openApp(page, { params: { ...base, td: DATE_BRISK, wk: '40' }, results: true });
+    await expect(state(page)).toHaveText('Estimate lowered');
+    await expect(state(page)).toHaveAttribute('aria-live', 'polite');
+    // The same element throughout: a live region that is inserted already holding its text is not reliably announced.
+    await state(page).evaluate((el) => ((el as HTMLElement & { __kept?: boolean }).__kept = true));
+    await slider(page).focus();
+    await page.keyboard.press('Home');
+    await expect(state(page)).toHaveText('');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await expect(state(page)).not.toHaveText('');
+    expect(await state(page).evaluate((el) => (el as HTMLElement & { __kept?: boolean }).__kept)).toBe(true);
   });
 
   test('a change within day-to-day swings has nothing to add', async ({ page }) => {
@@ -53,27 +71,29 @@ test.describe('training context card: states', () => {
     await page.keyboard.press('Home');
     await page.keyboard.press('ArrowRight'); // 0.5 kg lighter
     await expect(card(page)).toContainText('A change this small is within normal day-to-day swings in body weight, so there is nothing meaningful to add here.');
-    await expect(state(page)).toHaveCount(0);
+    await expect(state(page)).toHaveText('');
     await expect(weeklyKm(page)).toHaveCount(0);
     await page.keyboard.press('ArrowRight'); // 1 kg lighter: now there is something to say
-    await expect(state(page)).toHaveText('Matches the headline estimate');
+    await expect(state(page)).toHaveText(NOT_LOWERED);
   });
 
-  test('by default it matches the headline estimate and says what it assumed', async ({ page }) => {
+  test('by default it does not lower the headline estimate, says what it assumed, and does not pass for a forecast', async ({ page }) => {
     await openApp(page, { params: base, results: true });
-    await expect(state(page)).toHaveText('Matches the headline estimate');
+    await expect(state(page)).toHaveText(NOT_LOWERED);
     // Seen and heard: the same sentence with 0:59 for the eye and "59 seconds" for a screen reader.
-    await expect(summary(page)).toHaveText('The weight-based estimate of about 0:59 off your 10 km time stands, though it could be as little as 0:29.');
-    await expect(card(page).locator('p.sr-only')).toHaveText('The weight-based estimate of about 59 seconds off your 10 km time stands, though it could be as little as 29 seconds.');
+    await expect(summary(page)).toHaveText('This check did not lower the weight-based estimate of about 0:59 off your 10 km time. That is not a forecast: it could be as little as 0:29.');
+    await expect(card(page).locator('p.sr-only').filter({ hasText: 'This check' })).toHaveText('This check did not lower the weight-based estimate of about 59 seconds off your 10 km time. That is not a forecast: it could be as little as 29 seconds.');
     await expect(card(page)).toContainText('Weight change: Sustainable (0.5% of body weight a week) · Running: not entered');
     await expect(card(page)).toContainText('There is no future target date, so a sustainable pace of 0.5% of body weight a week is assumed.');
     await expect(card(page)).toContainText('Weekly running is not entered, so no allowance is made for it.');
     await expect(card(page)).toContainText('For large changes, or for weights close to the lowest this card gives figures for, a straight-line estimate is less reliable.');
     await expect(card(page)).toContainText('For most runners, steady training is the main lever for getting faster. Say how long you’ve been running regularly for a more specific note.');
     await expect(card(page)).toContainText('These figures assume you keep your training steady and get enough energy to fuel it.');
-    // The scope sentence is always there, never inside the disclosure.
+    // The scope sentence and the limits of the rules are always there, never inside the disclosure.
     await expect(card(page).locator('details').getByText(SCOPE)).toHaveCount(0);
     await expect(card(page).getByText(SCOPE)).toBeVisible();
+    await expect(card(page).locator('details').getByText(CAVEAT)).toHaveCount(0);
+    await expect(card(page).getByText(CAVEAT)).toBeVisible();
     // No distress or warning copy for an ordinary scenario, and nothing on the race cards.
     await expect(card(page)).not.toContainText(SUPPORT);
     await expect(card(page)).not.toContainText(SIGNS);
@@ -85,7 +105,7 @@ test.describe('training context card: states', () => {
     await weeklyKm(page).fill('40');
     await expect(card(page)).toContainText('Running: 40 km a week');
     await expect(card(page)).not.toContainText('Weekly running is not entered');
-    await expect(state(page)).toHaveText('Matches the headline estimate');
+    await expect(state(page)).toHaveText(NOT_LOWERED);
 
     // The history only selects one sentence: the figure does not move.
     const figure = await summary(page).textContent();
@@ -114,9 +134,12 @@ test.describe('training context card: states', () => {
     await expect(card(page)).not.toContainText(SUPPORT);
     // It never raises or replaces the headline: the main cards are untouched, and they point at this card.
     await expect(page.getByRole('listitem').filter({ hasText: /^10 km:/ })).toContainText('−0:59');
+    await expect(page.getByRole('listitem').filter({ hasText: /^10 km:/ })).toContainText('(0:29 to 1:28)');
     await expect(pointer(page)).toHaveText('Training context: a more cautious figure applies to this scenario. See the Training context card below.');
-    // The image may still be made: it shows the same headline estimate as the cards, which are not withheld.
-    await expect(saveButton(page)).toBeEnabled();
+    // No image: it would show the higher headline figure, and be read without this card.
+    await expect(page.getByText(SHARE_LOWERED)).toBeVisible();
+    await expect(saveButton(page)).toBeDisabled();
+    await expect(page.getByRole('img', { name: /^Image preview/ })).toHaveCount(0);
   });
 
   test('very high weekly running lowers the figure too, with its own reason', async ({ page }) => {
@@ -128,9 +151,53 @@ test.describe('training context card: states', () => {
     await expect(pointer(page)).toBeVisible();
   });
 
+  test('the unit toggle never moves the load tier: 100 km a week stays very high, and comes back as 100', async ({ page }) => {
+    await openApp(page, { params: { ...base, wk: '100' }, results: true });
+    await expect(state(page)).toHaveText('Estimate lowered');
+    await form(page).units('lb · in · mi').click();
+    // 100 km is 62.14 mi; a one-decimal 62.1 would read back as 99.94 km, just under the line.
+    await expect(weeklyKm(page)).toHaveValue('62.14');
+    await expect(state(page)).toHaveText('Estimate lowered');
+    await expect(card(page)).toContainText('Your weekly running is very high.');
+    await expect(card(page)).toContainText('Running: 62.14 mi a week');
+    await form(page).units('kg · cm · km').click();
+    await expect(weeklyKm(page)).toHaveValue('100');
+    await expect(state(page)).toHaveText('Estimate lowered');
+  });
+
+  test('the unit toggle keeps 50 km a week high (a note, no lowering) in both directions', async ({ page }) => {
+    await openApp(page, { params: { ...base, td: DATE_SUSTAINABLE, wk: '50' }, results: true });
+    const highNote = 'At this weekly distance your training already asks a lot of your energy supply';
+    await expect(card(page)).toContainText(highNote);
+    await form(page).units('lb · in · mi').click();
+    await expect(weeklyKm(page)).toHaveValue('31.07');
+    await expect(card(page)).toContainText(highNote);
+    await form(page).units('kg · cm · km').click();
+    await expect(weeklyKm(page)).toHaveValue('50');
+    await expect(card(page)).toContainText(highNote);
+  });
+
+  test('the pace of weight change is in the same class here as in the Timeline, for an imperial entry too', async ({ page }) => {
+    // 148 lb to 145.7 lb, by the date the Timeline itself suggests for 0.5 % a week. 148 lb is not a whole number of
+    // 0.1 kg, and working from the unrounded weight pushed this plan just over the limit.
+    await openApp(page, { params: { u: 'imperial', g: 'male', h: '71', w: '148', pm: '8', ps: '0', td: '2026-07-06', wk: '30' }, results: true });
+    await slider(page).focus();
+    await page.keyboard.press('Home');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await expect(slider(page)).toHaveAttribute('aria-valuetext', /^145\.7 lb, 2\.2 lb lost/);
+    const timeline = page.getByRole('region', { name: 'Timeline' });
+    await expect(timeline).toContainText('takes about 3 weeks (around Jul 6, 2026)');
+    await expect(timeline).toContainText('(0.50% per week)');
+    await expect(timeline).toContainText('Sustainable');
+    await expect(state(page)).toHaveText(NOT_LOWERED);
+    await expect(card(page)).toContainText('Weight change: Sustainable (0.5% of body weight a week)');
+    await expect(pointer(page)).toHaveCount(0);
+  });
+
   test('a high but not very high load at a sustainable pace keeps the figure and says so in a note', async ({ page }) => {
     await openApp(page, { params: { ...base, td: DATE_SUSTAINABLE, wk: '60' }, results: true });
-    await expect(state(page)).toHaveText('Matches the headline estimate');
+    await expect(state(page)).toHaveText(NOT_LOWERED);
     await expect(card(page)).toContainText('At this weekly distance your training already asks a lot of your energy supply, so any weight change is best kept slow and secondary to it.');
     await expect(card(page)).not.toContainText(SIGNS);
     await expect(pointer(page)).toHaveCount(0);
@@ -159,14 +226,19 @@ test.describe('training context card: states', () => {
     // Nothing typed there can change the outcome, so there is nothing to type.
     await expect(weeklyKm(page)).toHaveCount(0);
     await expect(history(page)).toHaveCount(0);
-    // The race cards say so, and no picture leaves the page.
+    // The race cards say so, drop the range (it assumes the healthy case) and lose the green on the saving, and no picture leaves the page.
     await expect(pointer(page)).toHaveText('Training context: the weight-based estimate here should not be relied on for this scenario. See the Training context card below.');
+    const tenK = page.getByRole('listitem').filter({ hasText: /^10 km:/ });
+    await expect(tenK).toContainText('−0:59');
+    await expect(tenK).not.toContainText('Estimated range');
+    await expect(tenK.getByText('(0:29 to 1:28)')).toHaveCount(0);
+    expect(await tenK.getByText('−0:59').evaluate((el) => getComputedStyle(el).color)).not.toBe(await page.locator('.text-primary-ink').first().evaluate((el) => getComputedStyle(el).color));
     await expect(page.getByText(SHARE_BLOCKED)).toBeVisible();
     await expect(saveButton(page)).toBeDisabled();
     expect(await brokenAriaReferences(page)).toEqual([]);
     // A later date and the image is back.
     await page.getByLabel('I want to get there by').fill(DATE_SUSTAINABLE);
-    await expect(state(page)).toHaveText('Matches the headline estimate');
+    await expect(state(page)).toHaveText(NOT_LOWERED);
     await expect(saveButton(page)).toBeEnabled();
     await expect(pointer(page)).toHaveCount(0);
   });
@@ -212,7 +284,7 @@ test.describe('training context card: states', () => {
     await expect(page.getByText(SHARE_BLOCKED)).toBeVisible();
     // Back at the current weight (its BMI is above the line) there is nothing to refuse: the card is idle again.
     await page.keyboard.press('Home');
-    await expect(state(page)).toHaveCount(0);
+    await expect(state(page)).toHaveText('');
     await expect(card(page)).toContainText('This card sets the weight-based estimate against how you train');
     await expect(pointer(page)).toHaveCount(0);
   });
@@ -248,7 +320,7 @@ test.describe('training context card: states', () => {
     await expect(slider(page)).toBeVisible();
 
     await weeklyKm(page).fill('45');
-    await expect(state(page)).toHaveText('Matches the headline estimate');
+    await expect(state(page)).toHaveText(NOT_LOWERED);
     await expect(alerts(page)).toHaveCount(0);
   });
 
@@ -322,9 +394,9 @@ test.describe('training context card: details', () => {
     await openApp(page, { params: { ...base, wk: '40' }, results: true });
     await expect(card(page)).toContainText('Running: 40 km a week');
     await form(page).units('lb · in · mi').click();
-    await expect(page.getByLabel(/^Running per week \(mi\)/)).toHaveValue('24.9');
-    await expect(card(page)).toContainText('Running: 24.9 mi a week');
-    await expect(state(page)).toHaveText('Matches the headline estimate');
+    await expect(page.getByLabel(/^Running per week \(mi\)/)).toHaveValue('24.85');
+    await expect(card(page)).toContainText('Running: 24.85 mi a week');
+    await expect(state(page)).toHaveText(NOT_LOWERED);
   });
 
   test('the weekly distance and the history survive a shared link, in both units', async ({ page }) => {
@@ -417,6 +489,8 @@ test.describe('training context card: other languages', () => {
       await expect(card(page)).toContainText(tr(lang, 'training.signs'));
       await expect(card(page)).toContainText(tr(lang, 'training.scope'));
       await expect(pointer(page)).toHaveText(tr(lang, 'training.pointer.reduced'));
+      await expect(card(page)).toContainText(tr(lang, 'training.caveat'));
+      await expect(page.getByText(tr(lang, 'training.output.shareLowered'))).toBeVisible();
 
       await openApp(page, { lang, params: { ...base, td: DATE_TOO_FAST, wk: '40' }, results: true });
       await expect(state(page)).toHaveText(tr(lang, 'training.state.withheld'));

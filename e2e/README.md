@@ -37,13 +37,14 @@ already have instead of the one Playwright installs (local use only).
 
 ## Speed
 
-The suite is CPU-bound (software-rendered Chromium), so its run time is the number of page loads and axe scans. 209
-tests take 2.4 to 2.6 minutes on 4 vCPUs (4 workers; more workers do not help). To keep it from growing:
+The suite is CPU-bound (software-rendered Chromium), so its run time is the number of page loads and axe scans. 236
+tests take 1.5 to 2.6 minutes on 4 vCPUs, depending on the machine (4 workers; more workers do not help). To keep it from growing:
 
 - Where a test checks both themes it loads the page once and flips the emulated colour scheme (`inEachTheme`); opening
   the page in dark from the start is covered in `shell.spec.ts`.
 - Tests are routed to projects instead of running everywhere: the four-language axe matrix (`@other-languages`) and the
-  320px reflow checks (`@phone`) run in the phone project only, touch tests (`touch.spec.ts`) only there too.
+  320px reflow checks (`@phone`) run in the phone project only, touch tests (`touch.spec.ts`) only there too, and the
+  1024-1280px window-width checks (`@desktop`) in the desktop project only.
 - Scans of one card (the Training context states) are scoped to it with `include`; the full page is scanned by
   `a11y.spec.ts`.
 
@@ -51,14 +52,15 @@ tests take 2.4 to 2.6 minutes on 4 vCPUs (4 workers; more workers do not help). 
 
 `support/axe.ts` runs axe with the WCAG 2.0/2.1 A and AA tags plus best practices. The soft page-background gradient is
 hidden for the duration of a scan: axe cannot compute the colour behind text that sits on a gradient and would
-report nearly all of it as "incomplete" instead of checking it. Open Radix popups (select lists) are scanned with the
+report nearly all of it as "incomplete" instead of checking it. The muted text colour is dark enough (about 5:1) for
+the greenest part of that gradient too, which a scan cannot see; the reasoning is in `support/axe.ts`. Open Radix popups (select lists) are scanned with the
 page-level rules that a modal popup breaks by design (landmarks, heading, hidden skip link) switched off.
 
 ## Known defects
 
-A few tests are annotated `test.fail(...)`: they assert the *fixed* behaviour of defects found while writing the suite
-(light-theme contrast of `text-destructive` text such as the "Too fast" label, flagged table rows, the warning box and
-the input panel's field errors; the contrast of the threshold-pace tooltip; the first click of the theme toggle; a
-duplicate `<meta name="description">`; the sticky header covering a focused control). They pass while the defect
-exists and start failing the run when it is fixed, which is the cue to delete the annotation (and, for the axe scans,
-the matching exclusion).
+None are parked: no test is annotated `test.fail`, and no scan leaves an element out to hide a failure. The defects found
+while the suite was written (light-theme contrast of the red text and the threshold-pace tooltip, the first click of the
+theme toggle, a duplicate `<meta name="description">`, the sticky header covering a focused control) are fixed and
+covered by ordinary tests (`a11y-states`, `shell`, `keyboard`). If a defect has to be reported before it can be fixed,
+annotate its test with `test.fail(true, reason)` and say so here; the annotation must be removed together with the fix,
+because a `test.fail` test that starts passing fails the run.

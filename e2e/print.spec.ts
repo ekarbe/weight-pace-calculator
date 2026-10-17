@@ -6,21 +6,22 @@ import { DATE_BRISK, SAMPLE, form, openApp, tr } from './support/app';
 const FULL = { ...SAMPLE, td: DATE_BRISK, wk: '40', th: 'some' };
 const HEALTH_NOTE = 'Estimates, not a weight-loss plan. Don’t aim below a healthy weight for your height; talk to a doctor or dietitian before changing your weight.';
 const printOnly = (page: Page) => page.locator('#print-stats-h');
-const footer = (page: Page) => page.locator('footer.print-footer');
+/** The date and bare address at the top of the printout (a footer would end up alone on an extra sheet when it does not fit). */
+const stamp = (page: Page) => page.getByTestId('print-stamp');
 
 /** Page count and the text of every page of the PDF the browser would print. */
-async function pdfText(page: Page): Promise<{ pages: number; text: string }> {
-  const data = await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true });
+async function pdfText(page: Page, format: 'A4' | 'Letter' = 'A4'): Promise<{ pages: number; perPage: string[]; text: string }> {
+  const data = await page.pdf({ format, printBackground: true, preferCSSPageSize: true });
   const task = getDocument({ data: new Uint8Array(data), verbosity: 0 });
   const doc = await task.promise;
   const chunks: string[] = [];
   for (let i = 1; i <= doc.numPages; i++) {
     const content = await (await doc.getPage(i)).getTextContent();
-    chunks.push(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
+    chunks.push(content.items.map((item) => ('str' in item ? item.str : '')).join(' ').replace(/\s+/g, ' '));
   }
   const pages = doc.numPages;
   await task.destroy();
-  return { pages, text: chunks.join('\n').replace(/\s+/g, ' ') };
+  return { pages, perPage: chunks, text: chunks.join('\n').replace(/\s+/g, ' ') };
 }
 
 test.describe('print', () => {
@@ -28,13 +29,13 @@ test.describe('print', () => {
     await openApp(page, { params: FULL, results: true });
     // On screen the print-only parts do not exist for the user.
     await expect(printOnly(page)).toBeHidden();
-    await expect(footer(page)).toBeHidden();
+    await expect(stamp(page)).toBeHidden();
 
     await page.emulateMedia({ media: 'print' });
     await expect(printOnly(page)).toBeVisible();
     await expect(page.getByText('Estimate running pace improvements based on weight loss.')).toBeVisible();
-    await expect(footer(page)).toContainText('Printed on Jun 15, 2026 · ');
-    await expect(footer(page)).toContainText(HEALTH_NOTE);
+    await expect(stamp(page)).toContainText('Printed on Jun 15, 2026 · ');
+    await expect(page.getByText(HEALTH_NOTE)).toBeVisible();
 
     // Gone: header, the form, the slider, buttons, the share image card and the site footer.
     await expect(page.getByRole('banner')).toBeHidden();
@@ -79,11 +80,11 @@ test.describe('print', () => {
     await expect(stats.locator('div', { has: page.locator('dt', { hasText: 'Threshold pace (min/km)' }) }).locator('dd')).toHaveText('5:16');
   });
 
-  test('the footer carries the bare address: no body measurements from the link', async ({ page }) => {
+  test('the stamp carries the bare address: no body measurements from the link', async ({ page }) => {
     await openApp(page, { params: FULL, results: true });
     await page.emulateMedia({ media: 'print' });
-    await expect(footer(page)).toContainText('Printed on Jun 15, 2026');
-    const text = (await footer(page).innerText()).replace(/\s+/g, ' ');
+    await expect(stamp(page)).toContainText('Printed on Jun 15, 2026');
+    const text = (await stamp(page).innerText()).replace(/\s+/g, ' ');
     expect(text).toContain(new URL('./', page.url()).href);
     expect(text).not.toMatch(/[?&=]|lang|g=|h=170|w=64/);
     expect(text).not.toMatch(/\b(170|64|22)\b/);
@@ -119,7 +120,7 @@ test.describe('print', () => {
     const tableDetails = page.locator('details', { has: page.locator('summary', { hasText: 'Full table' }) });
     await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
     await expect(tableDetails).toHaveAttribute('open', '');
-    await expect(footer(page)).toContainText('Printed on Jun 15, 2026');
+    await expect(stamp(page)).toContainText('Printed on Jun 15, 2026');
     await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
     await expect(tableDetails).not.toHaveAttribute('open', '');
   });
@@ -140,7 +141,7 @@ test.describe('print', () => {
   test('the PDF is short, complete and carries the health note without the link parameters', async ({ page }) => {
     await openApp(page, { params: FULL, results: true });
     await page.emulateMedia({ media: 'print' });
-    await expect(footer(page)).toBeVisible();
+    await expect(stamp(page)).toBeVisible();
     const { pages, text } = await pdfText(page);
     expect(pages).toBeGreaterThanOrEqual(1);
     // The stylesheet aims for about three A4 pages; one page of slack keeps browser differences from failing the run.
@@ -158,6 +159,25 @@ test.describe('print', () => {
     expect(text).not.toMatch(/[?&](lang|g|h|w|bf|pm|ps|d|td|wk|th)=/);
   });
 
+  // The sample prints on two or three sheets depending on language and paper (German, Spanish and French run longer, and
+  // Letter is shorter than A4). Whatever the count, the last sheet must hold real content: a stamp or a health note that
+  // does not fit used to end up alone on an extra sheet.
+  for (const [lang, format] of [['en', 'Letter'], ['en', 'A4'], ['de', 'A4'], ['de', 'Letter'], ['es', 'Letter'], ['fr', 'A4'], ['fr', 'Letter']] as const) {
+    test(`${lang} on ${format}: no sheet holds only a stamp or a health note`, async ({ page }) => {
+      await openApp(page, { lang, params: SAMPLE, results: true });
+      await page.emulateMedia({ media: 'print' });
+      await expect(stamp(page)).toBeVisible();
+      const { pages, perPage } = await pdfText(page, format);
+      expect(pages).toBeLessThanOrEqual(3);
+      for (const [i, text] of perPage.entries()) {
+        expect(text.split(' ').length, `sheet ${i + 1} of ${pages}: "${text.slice(0, 80)}..."`).toBeGreaterThan(60);
+      }
+      // The date and address are at the top of the first sheet, the health note is with the race cards.
+      expect(perPage[0]).toContain(tr(lang, 'health.note').split('.')[0]);
+      expect(perPage[0]).toContain(tr(lang, 'print.printedOn', { date: '' }).trim().split(' ')[0]);
+    });
+  }
+
   test('a long table still prints on a handful of pages', async ({ page }) => {
     await openApp(page, { params: { g: 'male', h: '195', w: '130', pm: '6', ps: '0' }, results: true });
     await page.emulateMedia({ media: 'print' });
@@ -171,8 +191,9 @@ test.describe('print', () => {
   test('is translated: German date, notes and health note on paper', async ({ page }) => {
     await openApp(page, { lang: 'de', params: FULL, results: true });
     await page.emulateMedia({ media: 'print' });
-    await expect(footer(page)).toContainText(tr('de', 'print.printedOn', { date: new Date('2026-06-15T09:00:00Z').toLocaleDateString('de', { year: 'numeric', month: 'short', day: 'numeric' }) }));
-    await expect(footer(page)).toContainText(tr('de', 'health.note'));
+    // The browser under test runs in UTC; so must the expected date, whatever the time zone of the machine running the suite.
+    await expect(stamp(page)).toContainText(tr('de', 'print.printedOn', { date: new Date('2026-06-15T09:00:00Z').toLocaleDateString('de', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) }));
+    await expect(page.getByText(tr('de', 'health.note'))).toBeVisible();
     const { text } = await pdfText(page);
     expect(text).toContain('Gedruckt am');
     expect(text).toContain(tr('de', 'health.note').split('.')[0] + '.');

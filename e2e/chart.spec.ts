@@ -17,6 +17,18 @@ test.describe('chart', () => {
     expect(label).toMatch(/Estimated range at 61 kg: .+ to .+\.$/);
   });
 
+  test('below the BMI floor there is no range to draw or announce (it used to read slow to fast, backwards)', async ({ page }) => {
+    // 170 cm at 50 kg is BMI 17.3: the table has one row, the heavier floor weight, and nothing is "lost".
+    await openApp(page, { params: { g: 'female', h: '170', w: '50', pm: '5', ps: '0' }, results: true });
+    await expect(chart(page)).toBeVisible();
+    await expect(chart(page)).not.toHaveAttribute('aria-label', /Estimated range/);
+    await expect(page.getByRole('switch', { name: 'Show range' })).toHaveCount(0);
+    await expect(chart(page).locator('path[stroke-dasharray]')).toHaveCount(0);
+    // The estimate itself and the disclaimer are still there.
+    await expect(marker(page)).toHaveText(/^\d\d:\d\d$/);
+    await expect(page.getByText(/^The pace gain per kg lost is a rule of thumb/)).toBeVisible();
+  });
+
   test('metric buttons switch what is plotted, and the marker agrees with the matching card', async ({ page }) => {
     await openApp(page, { params: SAMPLE, results: true });
     const metrics: [string, string, RegExp][] = [

@@ -75,13 +75,32 @@ test.describe('threshold pace from a recent race', () => {
     await seconds(page).fill('0');
 
     await expect(slider(page)).toBeVisible();
-    // The race (5K in 25:00) wins over the hidden typed pace (5:00): 24:33 here instead of 23:17.
-    await expect(cardTime(page, '5 km')).toHaveText('24:33');
-    await expect(cardTime(page, '10 km')).toHaveText('50:38');
-    await expect(cardTime(page, 'Half marathon')).toHaveText('01:53:22');
-    await expect(cardTime(page, 'Marathon')).toHaveText('03:59:48');
+    // The race (5K in 25:00) wins over the hidden typed pace (5:00): 24:31 here instead of 23:17.
+    await expect(cardTime(page, '5 km')).toHaveText('24:31');
+    await expect(cardTime(page, '10 km')).toHaveText('50:36');
+    await expect(cardTime(page, 'Half marathon')).toHaveText('01:53:17');
+    await expect(cardTime(page, 'Marathon')).toHaveText('03:59:39');
     await page.locator('summary', { hasText: /^Full table/ }).click();
     await expect(page.locator('tbody tr').first().locator('td').nth(2)).toHaveText('5:16');
+  });
+
+  test('at the current weight the cards give back the race time that was entered, in either unit', async ({ page }) => {
+    // The pace is worked back from the result without rounding, so nothing is lost on the way there and back.
+    await openApp(page, { params: { ...base, pm: '4', ps: '0', pace: 'race', rd: '10k', rtm: '48', rts: '26' }, results: true });
+    await slider(page).focus();
+    await page.keyboard.press('Home');
+    await expect(cardTime(page, '10 km')).toHaveText('48:26');
+    const times = await Promise.all(['5 km', 'Half marathon', 'Marathon'].map((n) => cardTime(page, n).innerText()));
+    await form(page).units('lb · in · mi').click();
+    await slider(page).focus();
+    await page.keyboard.press('Home');
+    await expect(cardTime(page, '10 km')).toHaveText('48:26');
+    for (const [i, n] of ['5 km', 'Half marathon', 'Marathon'].entries()) await expect(cardTime(page, n)).toHaveText(times[i]);
+    // 3:00:00 for a marathon is given back as 3:00:00, not as 3:00:15.
+    await openApp(page, { params: { ...base, pace: 'race', rd: 'm', rth: '3', rtm: '0', rts: '0' }, results: true });
+    await slider(page).focus();
+    await page.keyboard.press('Home');
+    await expect(cardTime(page, 'Marathon')).toHaveText('03:00:00');
   });
 
   test('bad times and distances are explained next to the field', async ({ page }) => {

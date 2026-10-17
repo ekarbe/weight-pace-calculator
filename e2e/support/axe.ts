@@ -22,6 +22,8 @@ export interface AxeOptions {
  * The page background is a soft radial gradient (`.mesh-background`). axe cannot work out the colour behind text that
  * sits over a gradient, so it reports almost all of it as "incomplete" instead of checking it. Hiding the gradient for
  * the duration of a scan makes the contrast check real; the gradient is only a faint tint of the same background.
+ * That tint is the one thing this cannot see, so the muted text colour is chosen to keep 4.5:1 on its darkest part
+ * (rgb 211,236,222): --muted-foreground is #5f5f64 (5.1:1 there; the earlier #6e6e73 was 4.06:1).
  */
 const FLAT_BACKGROUND = '.mesh-background { display: none !important; }';
 
