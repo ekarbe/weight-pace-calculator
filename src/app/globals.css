@@ -33,6 +33,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-ink: var(--destructive-ink);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -67,10 +68,13 @@
   --secondary: #e5e5ea;
   --secondary-foreground: #1d1d1f;
   --muted: #e5e5ea;
-  --muted-foreground: #6e6e73;
+  /* Dark enough for 4.5:1 also on the greenest part of the page background (the mesh tints it): 5:1 there. */
+  --muted-foreground: #5f5f64;
   --accent: #e5e5ea;
   --accent-foreground: #1d1d1f;
   --destructive: #ff3b30;
+  /* Darker red for text on light surfaces (AA contrast, about 6:1 on the card); borders and fills use --destructive. */
+  --destructive-ink: #b3261e;
   --border: rgba(0, 0, 0, 0.04);
   --input: rgba(0, 0, 0, 0.08);
   /* Darker than --primary so focus indicators reach 3:1 on light surfaces. */
@@ -103,6 +107,7 @@
   --accent: #1c1c1e;
   --accent-foreground: #f5f5f7;
   --destructive: #ff453a;
+  --destructive-ink: #ff453a;
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.15);
   --ring: #30d158;
@@ -118,6 +123,10 @@
 }
 
 @layer base {
+  /* The sticky header is 4rem tall: a focused control scrolled into view must not end up underneath it. */
+  html {
+    scroll-padding-top: 5rem;
+  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -173,6 +182,20 @@
 .glassmorphism {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* Windows High Contrast and other forced-colour modes replace author backgrounds, so a pressed toggle that is shown only
+   by a fill (and a button that has no border) would look like plain text. */
+@media (forced-colors: active) {
+  [data-slot="button"] {
+    border: 1px solid ButtonText;
+  }
+  [aria-pressed="true"] {
+    forced-color-adjust: none;
+    background-color: Highlight;
+    color: HighlightText;
+    border-color: HighlightText;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

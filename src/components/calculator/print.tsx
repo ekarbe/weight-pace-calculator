@@ -23,8 +23,49 @@ export function PrintButton() {
   );
 }
 
+export interface PrintStamp {
+  when: Date;
+  url: string;
+}
+
+/**
+ * Owns the print lifecycle (always mounted, by the page): expands every closed <details> before printing and puts them
+ * back afterwards, and returns the date and bare address for the printout. The stamp sits in the header block, not in a
+ * footer: a footer that does not fit on the last page ends up alone on an extra sheet.
+ */
+export function usePrintStamp(): PrintStamp | null {
+  const [stamp, setStamp] = useState<PrintStamp | null>(null);
+
+  useEffect(() => {
+    const expander = createDetailsExpander();
+    const before = () => {
+      expander.open(document.querySelectorAll('details'));
+      // The page is laid out for printing as soon as this returns, so the date must already be in the DOM.
+      flushSync(() => setStamp({ when: new Date(), url: appUrl(window.location.href) }));
+    };
+    const after = () => expander.restore();
+    // Safari and some embedded browsers only report printing through the media query.
+    const mq = window.matchMedia('print');
+    const onMedia = (e: MediaQueryListEvent) => (e.matches ? before() : after());
+
+    window.addEventListener('beforeprint', before);
+    window.addEventListener('afterprint', after);
+    if (mq.addEventListener) mq.addEventListener('change', onMedia);
+    else mq.addListener(onMedia);
+    return () => {
+      window.removeEventListener('beforeprint', before);
+      window.removeEventListener('afterprint', after);
+      if (mq.removeEventListener) mq.removeEventListener('change', onMedia);
+      else mq.removeListener(onMedia);
+      expander.restore();
+    };
+  }, []);
+
+  return stamp;
+}
+
 /** Print-only title and "Your stats" summary (the form itself is not printed). Hidden on screen. */
-export function PrintInputs({ form, adv, startKg, targetKg }: { form: FormState; adv: AdvancedState; startKg: number; targetKg: number }) {
+export function PrintInputs({ form, adv, startKg, targetKg, stamp }: { form: FormState; adv: AdvancedState; startKg: number; targetKg: number; stamp: PrintStamp | null }) {
   const { t, locale, date } = useI18n();
   const today = useMemo(() => new Date(), []);
   const facts = useMemo(() => printFacts(form, adv, { startKg, targetKg }, today), [form, adv, startKg, targetKg, today]);
@@ -57,6 +98,11 @@ export function PrintInputs({ form, adv, startKg, targetKg }: { form: FormState;
         <span className="text-xl font-extrabold tracking-tight">{t('header.title')}</span>
       </div>
       <p className="mt-1 text-sm">{t('meta.description')}</p>
+      {stamp && (
+        <p data-testid="print-stamp" className="mt-1 text-[11px] font-semibold text-foreground">
+          {t('print.printedOn', { date: date(stamp.when) })} · {stamp.url}
+        </p>
+      )}
       <h2 id="print-stats-h" className="mt-4 text-sm! font-bold uppercase tracking-widest text-muted-foreground">{t('inputs.heading')}</h2>
       <dl className="mt-2 grid grid-cols-4 gap-x-4 gap-y-2">
         {rows.map(([label, value]) => (
@@ -67,50 +113,5 @@ export function PrintInputs({ form, adv, startKg, targetKg }: { form: FormState;
         ))}
       </dl>
     </section>
-  );
-}
-
-/**
- * Print-only footer (app address without the query, date, health note), always mounted so that it also
- * owns the print lifecycle: expand every closed <details> before printing and put them back afterwards.
- */
-export function PrintFooter() {
-  const { t, date } = useI18n();
-  const [stamp, setStamp] = useState<{ when: Date; url: string } | null>(null);
-
-  useEffect(() => {
-    const expander = createDetailsExpander();
-    const before = () => {
-      expander.open(document.querySelectorAll('details'));
-      // The page is laid out for printing as soon as this returns, so the date must already be in the DOM.
-      flushSync(() => setStamp({ when: new Date(), url: appUrl(window.location.href) }));
-    };
-    const after = () => expander.restore();
-    // Safari and some embedded browsers only report printing through the media query.
-    const mq = window.matchMedia('print');
-    const onMedia = (e: MediaQueryListEvent) => (e.matches ? before() : after());
-
-    window.addEventListener('beforeprint', before);
-    window.addEventListener('afterprint', after);
-    if (mq.addEventListener) mq.addEventListener('change', onMedia);
-    else mq.addListener(onMedia);
-    return () => {
-      window.removeEventListener('beforeprint', before);
-      window.removeEventListener('afterprint', after);
-      if (mq.removeEventListener) mq.removeEventListener('change', onMedia);
-      else mq.removeListener(onMedia);
-      expander.restore();
-    };
-  }, []);
-
-  return (
-    <footer className="print-footer hidden print:block">
-      {stamp && (
-        <p className="text-[11px] font-semibold text-foreground">
-          {t('print.printedOn', { date: date(stamp.when) })} · {stamp.url}
-        </p>
-      )}
-      <p className="mt-1 text-[11px]">{t('health.note')}</p>
-    </footer>
   );
 }

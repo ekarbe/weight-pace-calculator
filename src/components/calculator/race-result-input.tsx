@@ -34,8 +34,7 @@ const TIME_FIELDS = [
 
 function FieldError({ id, message }: { id: string; message?: MessageKey }) {
   const { t } = useI18n();
-  // text-destructive is only 3.5:1 on the light card; this red passes AA.
-  return message ? <p id={id} role="alert" className="text-red-700 dark:text-destructive text-xs mt-1">{t(message)}</p> : null;
+  return message ? <p id={id} role="alert" className="text-destructive-ink text-xs mt-1">{t(message)}</p> : null;
 }
 
 /** aria-describedby must only point at an element that exists. */
@@ -53,7 +52,7 @@ export function RaceResultInput({ form, errors, onChange }: Props) {
     <div className={cn('space-y-3', !race && 'mb-3')}>
       <div role="group" aria-label={t('raceResult.source.group')} className="grid grid-cols-2 gap-1 rounded-full border p-1">
         {PACE_SOURCES.map((s) => (
-          <Button key={s} type="button" size="sm" className="h-auto min-h-8 whitespace-normal px-3 py-1 leading-tight" variant={form.paceSource === s ? 'default' : 'ghost'} aria-pressed={form.paceSource === s} onClick={() => onChange({ paceSource: s })}>
+          <Button key={s} type="button" size="sm" className="h-auto min-h-8 min-w-0 whitespace-normal px-2 py-1 leading-tight [overflow-wrap:anywhere] hyphens-auto" variant={form.paceSource === s ? 'default' : 'ghost'} aria-pressed={form.paceSource === s} onClick={() => onChange({ paceSource: s })}>
             {t(s === 'race' ? 'raceResult.source.race' : 'raceResult.source.threshold')}
           </Button>
         ))}

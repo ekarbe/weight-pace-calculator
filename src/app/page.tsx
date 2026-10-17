@@ -10,7 +10,7 @@ import { PaceChart } from '@/components/calculator/pace-chart';
 import { PlanCard } from '@/components/calculator/plan-card';
 import { TrainingCard } from '@/components/calculator/training-card';
 import { ResultsTable } from '@/components/calculator/results-table';
-import { PrintButton, PrintFooter, PrintInputs } from '@/components/calculator/print';
+import { PrintButton, PrintInputs, usePrintStamp } from '@/components/calculator/print';
 import { calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DEFAULT_TARGET_BMI_FLOOR } from '@/lib/calculations';
 import { calculateBand } from '@/lib/band';
 import { useI18n } from '@/i18n/provider';
@@ -36,6 +36,7 @@ export default function HomePage() {
   });
   const [sliderIndex, setSliderIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const printStamp = usePrintStamp();
 
   useEffect(() => {
     const f = decodeForm(window.location.search);
@@ -140,7 +141,7 @@ export default function HomePage() {
             <p role="status" className="sr-only">{rows.length > 0 ? t('sr.ready') : ''}</p>
             {results && rows.length > 0 ? (
               <>
-                <PrintInputs form={form} adv={adv} startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} />
+                <PrintInputs form={form} adv={adv} startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} stamp={printStamp} />
                 <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} band={band} trainingPointer={trainingResult?.pointer} />
                 <ShareImageCard rows={rows} index={index} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} trainingBlocked={trainingResult?.blocksOutputs} trainingReduced={trainingResult?.reduced} />
                 <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
@@ -169,7 +170,6 @@ export default function HomePage() {
         </div>
       </main>
       <Footer />
-      <PrintFooter />
     </div>
   );
 }

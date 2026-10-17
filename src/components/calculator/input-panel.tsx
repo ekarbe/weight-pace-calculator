@@ -27,7 +27,7 @@ interface Props {
 
 function FieldError({ id, message }: { id: string; message?: MessageKey }) {
   const { t } = useI18n();
-  return message ? <p id={id} role="alert" className="text-destructive text-xs mt-1">{t(message)}</p> : null;
+  return message ? <p id={id} role="alert" className="text-destructive-ink text-xs mt-1">{t(message)}</p> : null;
 }
 
 /** aria-describedby must only point at an element that exists. */
@@ -95,7 +95,7 @@ export function InputPanel({ form, adv, errors, copied, onChange, onUnits, onAdv
               <TooltipTrigger asChild>
                 <button type="button" aria-label={t('pace.help')} className="text-muted-foreground"><Info className="w-4 h-4" /></button>
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs"><p>{t('pace.tooltip')}</p></TooltipContent>
+              <TooltipContent className="max-w-xs"><p className="text-primary-foreground">{t('pace.tooltip')}</p></TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </legend>

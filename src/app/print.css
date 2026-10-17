@@ -34,6 +34,7 @@
     --accent: #eeeef0;
     --accent-foreground: #111114;
     --destructive: #b3261e;
+    --destructive-ink: #b3261e;
     --border: #c9c9ce;
     --input: #c9c9ce;
     --ring: #117a35;
@@ -94,10 +95,10 @@
   }
   /* Tighter vertical rhythm: cards and the gaps between them. */
   .space-y-6 > :not(:last-child) {
-    margin-block-end: 12px;
+    margin-block-end: 8px;
   }
   .rounded-3xl {
-    padding: 14px 18px;
+    padding: 10px 16px;
   }
 
   /* ---- Pagination ---- */
@@ -219,11 +220,5 @@
   /* Notes: a touch smaller. */
   details ul {
     font-size: 12px;
-  }
-  .print-footer {
-    margin-top: 16px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
-    break-inside: avoid;
   }
 }

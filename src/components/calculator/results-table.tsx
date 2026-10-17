@@ -33,7 +33,7 @@ export function ResultsTable({ rows, warnings, units, enteredWeight, selected }:
             </TableHeader>
             <TableBody>
               {rows.map((r, i) => (
-                <TableRow key={i} aria-current={i === selected ? 'true' : undefined} className={cn('tabular-nums', i === selected && 'bg-primary/10', r.isPotentiallyUnhealthyFat && 'text-destructive')}>
+                <TableRow key={i} aria-current={i === selected ? 'true' : undefined} className={cn('tabular-nums', i === selected && 'bg-primary/10', r.isPotentiallyUnhealthyFat && 'text-destructive-ink')}>
                   <TableCell className="text-center font-medium">{w(r.targetWeightKg, i)}</TableCell>
                   <TableCell className="text-center">
                     {r.estimatedBodyFatPercentage !== null ? num(r.estimatedBodyFatPercentage, 1) : '–'}

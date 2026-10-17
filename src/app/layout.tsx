@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from 'next-themes'
@@ -8,9 +7,8 @@ import { SkipLink } from "@/components/ui/skip-link";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
-export const metadata: Metadata = {
-  description: "Estimate running pace improvements based on weight loss.",
-};
+// No `metadata` export: the title and the description are rendered by I18nProvider, in the page language. A static
+// description here ended up next to the translated one as a second, English <meta name="description">.
 
 export default function RootLayout({
   children,
