@@ -14,10 +14,10 @@ test.describe('race cards', () => {
     await expect(page.getByText('−3.0 kg · threshold pace 4:54 /km · 10K 0:59 faster')).toBeVisible();
 
     const expected = [
-      ['5 km', '23:17', '−0:29', '(0:14 to 0:43)', '5 km: 23 minutes and 17 seconds, 29 seconds faster than now. Estimated range: 14 seconds to 43 seconds faster.'],
-      ['10 km', '48:01', '−0:59', '(0:29 to 1:28)', '10 km: 48 minutes and 1 second, 59 seconds faster than now. Estimated range: 29 seconds to 1 minute and 28 seconds faster.'],
-      ['Half marathon', '01:47:31', '−2:12', '(1:06 to 3:17)', 'Half marathon: 1 hour, 47 minutes, and 31 seconds, 2 minutes and 12 seconds faster than now.'],
-      ['Marathon', '03:47:26', '−4:38', '(2:19 to 6:58)', 'Marathon: 3 hours, 47 minutes, and 26 seconds, 4 minutes and 38 seconds faster than now.'],
+      ['5 km', '23:17', '−0:29', 'Range: 0:14 to 0:43', '5 km: 23 minutes and 17 seconds, 29 seconds faster than now. Estimated range: 14 seconds to 43 seconds faster.'],
+      ['10 km', '48:01', '−0:59', 'Range: 0:29 to 1:28', '10 km: 48 minutes and 1 second, 59 seconds faster than now. Estimated range: 29 seconds to 1 minute and 28 seconds faster.'],
+      ['Half marathon', '01:47:31', '−2:12', 'Range: 1:06 to 3:17', 'Half marathon: 1 hour, 47 minutes, and 31 seconds, 2 minutes and 12 seconds faster than now.'],
+      ['Marathon', '03:47:26', '−4:38', 'Range: 2:19 to 6:58', 'Marathon: 3 hours, 47 minutes, and 26 seconds, 4 minutes and 38 seconds faster than now.'],
     ] as const;
     for (const [name, time, saved, range, spoken] of expected) {
       await expect(cardTime(page, name)).toHaveText(time);
@@ -29,6 +29,18 @@ test.describe('race cards', () => {
       await expect(card.locator('div[aria-hidden="true"]').first()).toBeVisible();
     }
     await expect(page.getByRole('listitem').filter({ hasText: /^15 km:/ })).toHaveCount(0);
+    // What the range assumes is said at the cards, not only under the chart.
+    await expect(page.getByText('The range assumes mostly fat lost, with training and fuelling kept up. The gain can be smaller or absent.')).toBeVisible();
+  });
+
+  test('there is no range note where there is no range (nothing lost, or the Training card withholds the estimate)', async ({ page }) => {
+    await openApp(page, { params: noCustom, results: true });
+    const note = page.getByText('The range assumes mostly fat lost');
+    await expect(note).toBeVisible();
+    await slider(page).focus();
+    await page.keyboard.press('Home');
+    await expect(note).toHaveCount(0);
+    await expect(raceCard(page, '5 km')).not.toContainText('Range');
   });
 
   test('the health note is always shown with the cards', async ({ page }) => {
@@ -44,7 +56,7 @@ test.describe('race cards', () => {
     await expect(card).toContainText('Your distance');
     await expect(cardTime(page, '15 km')).toHaveText('01:14:26');
     await expect(card).toContainText('−1:31');
-    await expect(card).toContainText('(0:46 to 2:17)');
+    await expect(card).toContainText('Range: 0:46 to 2:17');
     await expect(card.locator('p.sr-only')).toContainText('15 km: 1 hour, 14 minutes, and 26 seconds, 1 minute and 31 seconds faster than now.');
     // It is the model's number, not a lookup.
     expect(formatTime(estimateRaceTimeSec(THRESHOLD_AT_61, 15))).toBe('01:14:26');

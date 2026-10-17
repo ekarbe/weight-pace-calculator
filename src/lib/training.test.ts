@@ -122,7 +122,17 @@ describe('worked examples', () => {
         expect(r.showSigns).toBe(false);
         expect(r.blocksOutputs).toBe(false);
         expect(r.pointer).toBe('none');
+        // Nothing was set against the figure (assumed rate, no distance), so the summary must not read as a check that passed.
+        expect(chooseSummary(r)).toBe('unchecked');
+    });
+
+    it('A2: with a weekly distance entered the same figure reads as unadjusted, not unchecked', () => {
+        const r = full(run({ weeklyKm: 40 }));
+        expect(r.rate.source).toBe('assumed');
+        expect(r.reduced).toBe(false);
         expect(chooseSummary(r)).toBe('same');
+        // And so does a real target date with no distance entered.
+        expect(chooseSummary(full(run({ targetDate: dateIn(400) })))).toBe('same');
     });
 
     it('B: a brisk plan lowers the figure halfway to the lowest, says why and points from the race cards', () => {
@@ -213,7 +223,8 @@ describe('worked examples', () => {
                 savingsOf(f).forEach((v) => expect(v).toBeCloseTo(19.6, 6));
                 expect(f.reduced).toBe(false);
                 expect(f.reasons).toEqual([]);
-                expect(chooseSummary(f)).toBe('flat');
+                // Unchecked (no date, no distance) wins over flat: it must not read as a check that passed.
+                expect(chooseSummary(f)).toBe(targetDate === '' && weeklyKm === null ? 'unchecked' : 'flat');
             }
         }
     });
@@ -498,14 +509,17 @@ describe('notes', () => {
 });
 
 describe('display helpers', () => {
-    it('chooseSummary: reduced, flat when the whole seconds agree, else same', () => {
+    it('chooseSummary: reduced, unchecked when nothing was set against the figure, flat when the whole seconds agree, else same', () => {
         expect(chooseSummary(full(run({ targetDate: dateIn(42) })))).toBe('reduced');
-        expect(chooseSummary(full(run()))).toBe('same');
-        expect(chooseSummary(full(run({ centralFactor: 0.5, headlineGainSecPerKm: 2 })))).toBe('flat');
+        expect(chooseSummary(full(run()))).toBe('unchecked');
+        expect(chooseSummary(full(run({ weeklyKm: 20 })))).toBe('same');
+        expect(chooseSummary(full(run({ weeklyKm: 20, centralFactor: 0.5, headlineGainSecPerKm: 2 })))).toBe('flat');
+        // A lowered figure is reported as lowered even when nothing else was entered (factor above the ceiling).
+        expect(chooseSummary(full(run({ centralFactor: 4, headlineGainSecPerKm: 16 })))).toBe('reduced');
         // Pace cap: 4 s/km at the lowest, 5 shown -> 39 s against 49 s.
-        expect(chooseSummary(full(run({ headlineGainSecPerKm: 5 })))).toBe('same');
+        expect(chooseSummary(full(run({ weeklyKm: 20, headlineGainSecPerKm: 5 })))).toBe('same');
         // 1 kg change at factor 1.05: 9.8 s against 10.29 s -> 10 and 10 whole seconds.
-        expect(chooseSummary(full(run({ targetKg: 79, centralFactor: 1.05, headlineGainSecPerKm: 1.05 })))).toBe('flat');
+        expect(chooseSummary(full(run({ weeklyKm: 20, targetKg: 79, centralFactor: 1.05, headlineGainSecPerKm: 1.05 })))).toBe('flat');
         expect(chooseSummary(run({ targetDate: dateIn(21) }))).toBeNull();
         expect(chooseSummary(run({ baselinePaceSec: 0 }))).toBeNull();
     });
@@ -552,14 +566,13 @@ describe('integration with the calculator', () => {
     const user: UserInput = { gender: 'male', heightCm: 175, weightKg: 60, bodyFatPercentage: null, thresholdPaceMin: 5, thresholdPaceSec: 0, paceFactorSecPerKg: 2, bmiFloor: 20 };
     const none = { weeklyKm: null, weeklyKmError: null };
 
-    it('uses the entered weight, not the heavier floor row, as the starting point', () => {
+    it('starts from the entered weight when it is already under the BMI line, and withholds', () => {
         const rows = calculateWeightPaceEstimates(user).resultsTable;
-        expect(rows[0].targetWeightKg).toBeGreaterThan(user.weightKg); // the floor quirk
+        // The table keeps the entered weight as its only row (it used to jump to the heavier floor weight).
+        expect(rows).toHaveLength(1);
+        expect(rows[0].targetWeightKg).toBe(user.weightKg);
         const r = computeTraining(trainingInputFor(user, rows[0], rows[0].targetWeightKg, none, ''), today);
         expect(r).toMatchObject({ withheld: 'lowBmi', lowBmiAt: 'current', blocksOutputs: false, pointer: 'none', showHelp: true });
-        // Starting from rows[0] instead would have hidden the problem.
-        const wrong = { ...trainingInputFor(user, rows[0], rows[0].targetWeightKg, none, ''), startKg: rows[0].targetWeightKg };
-        expect(computeTraining(wrong, today).display).toBe('idle');
     });
 
     it('puts the pace of weight change in the same class as the Timeline card, for imperial entries too', () => {

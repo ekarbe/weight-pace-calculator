@@ -85,7 +85,7 @@ export type IdleKind = 'none' | 'tiny';
 export type LowBmiAt = 'current' | 'selected';
 /** What the race cards (above the Training card) must say about this scenario. */
 export type TrainingPointer = 'none' | 'reduced' | 'withheld';
-export type SummaryKind = 'same' | 'flat' | 'reduced';
+export type SummaryKind = 'same' | 'flat' | 'reduced' | 'unchecked';
 
 export interface LossRate {
     pct: number;
@@ -94,7 +94,7 @@ export interface LossRate {
 }
 
 export interface TrainingInput {
-    /** The ENTERED weight. Not rows[0]: when it is below the BMI floor, rows[0] is the heavier floor weight. */
+    /** The ENTERED weight (the table's first row is this weight rounded to 0.1 kg, see `rateStartKg`). */
     startKg: number;
     /** Selected row's weight. */
     targetKg: number;
@@ -299,12 +299,14 @@ export function computeTraining(i: TrainingInput, today: Date): TrainingResult {
 
 /**
  * Which summary sentence applies to a full result: 'reduced' when the figure is visibly lower than the headline;
- * 'flat' when the lowest and the shown figure read the same in whole seconds (no "could be as little as" clause);
- * otherwise 'same'. Null for a result without figures.
+ * 'unchecked' when nothing could be set against it (no target date, so the pace of weight change is only assumed, and
+ * no weekly running), which must not read as a check that passed; 'flat' when the lowest and the shown figure read the
+ * same in whole seconds (no "could be as little as" clause); otherwise 'same'. Null for a result without figures.
  */
 export function chooseSummary(r: TrainingResult): SummaryKind | null {
     if (r.display !== 'full' || !r.savings10k) return null;
     if (r.reduced) return 'reduced';
+    if (r.rate?.source === 'assumed' && r.load === 'unknown') return 'unchecked';
     return Math.round(r.savings10k.conservative) === Math.round(r.savings10k.realistic) ? 'flat' : 'same';
 }
 

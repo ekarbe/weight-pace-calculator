@@ -19,7 +19,8 @@ const BRISK_REASON = 'A brisk pace of weight change is harder to combine with go
 const SHARE_BLOCKED = 'No image for this scenario: the Training context card shows no estimate for it.';
 const SHARE_LOWERED = 'No image for this scenario: the Training context card lowers the estimate for it, and an image would show the higher headline figure.';
 const CAVEAT = 'This card looks only at the pace of weight change and your weekly running, and it can lower an estimate or hold it back, never raise it. Its limits are rules of thumb, not measurements, and have not been checked against outcomes. This is general information, not medical or coaching advice.';
-const NOT_LOWERED = 'Estimate not lowered';
+/** The neutral state: the card made no change. It is not a pass, and the summary says what was and was not looked at. */
+const NOT_LOWERED = 'No adjustment applied';
 
 /** The card's text without the closed explainer, which legitimately talks about s/km and thresholds. */
 const visibleText = (page: Page) =>
@@ -81,8 +82,8 @@ test.describe('training context card: states', () => {
     await openApp(page, { params: base, results: true });
     await expect(state(page)).toHaveText(NOT_LOWERED);
     // Seen and heard: the same sentence with 0:59 for the eye and "59 seconds" for a screen reader.
-    await expect(summary(page)).toHaveText('This check did not lower the weight-based estimate of about 0:59 off your 10 km time. That is not a forecast: it could be as little as 0:29.');
-    await expect(card(page).locator('p.sr-only').filter({ hasText: 'This check' })).toHaveText('This check did not lower the weight-based estimate of about 59 seconds off your 10 km time. That is not a forecast: it could be as little as 29 seconds.');
+    await expect(summary(page)).toHaveText('Nothing was checked: with no target date and no weekly running entered, this card has nothing to set against the weight-based estimate of about 0:59 off your 10 km time. It is the headline figure, unchanged, and not a forecast.');
+    await expect(card(page).locator('p.sr-only').filter({ hasText: 'Nothing was checked' })).toHaveText('Nothing was checked: with no target date and no weekly running entered, this card has nothing to set against the weight-based estimate of about 59 seconds off your 10 km time. It is the headline figure, unchanged, and not a forecast.');
     await expect(card(page)).toContainText('Weight change: Sustainable (0.5% of body weight a week) · Running: not entered');
     await expect(card(page)).toContainText('There is no future target date, so a sustainable pace of 0.5% of body weight a week is assumed.');
     await expect(card(page)).toContainText('Weekly running is not entered, so no allowance is made for it.');
@@ -106,6 +107,12 @@ test.describe('training context card: states', () => {
     await expect(card(page)).toContainText('Running: 40 km a week');
     await expect(card(page)).not.toContainText('Weekly running is not entered');
     await expect(state(page)).toHaveText(NOT_LOWERED);
+    // With a distance entered something was looked at, and the summary says what does and does not move the figure.
+    await expect(summary(page)).toHaveText('This check made no adjustment: the weight-based estimate of about 0:59 off your 10 km time is the headline figure. Running under 100 km a week, and your running history, do not change it. That is not a forecast: it could be as little as 0:29.');
+    // The fields say what they do: the history picks a note, and only a high weekly distance changes what the card shows.
+    await expect(card(page)).toContainText('Only a high weekly distance changes what this card shows.');
+    await expect(card(page)).toContainText('This only picks the note above. It does not change any figure.');
+    await expect(history(page)).toHaveAccessibleDescription('This only picks the note above. It does not change any figure.');
 
     // The history only selects one sentence: the figure does not move.
     const figure = await summary(page).textContent();
@@ -134,7 +141,7 @@ test.describe('training context card: states', () => {
     await expect(card(page)).not.toContainText(SUPPORT);
     // It never raises or replaces the headline: the main cards are untouched, and they point at this card.
     await expect(page.getByRole('listitem').filter({ hasText: /^10 km:/ })).toContainText('−0:59');
-    await expect(page.getByRole('listitem').filter({ hasText: /^10 km:/ })).toContainText('(0:29 to 1:28)');
+    await expect(page.getByRole('listitem').filter({ hasText: /^10 km:/ })).toContainText('Range: 0:29 to 1:28');
     await expect(pointer(page)).toHaveText('Training context: a more cautious figure applies to this scenario. See the Training context card below.');
     // No image: it would show the higher headline figure, and be read without this card.
     await expect(page.getByText(SHARE_LOWERED)).toBeVisible();
@@ -231,15 +238,25 @@ test.describe('training context card: states', () => {
     const tenK = page.getByRole('listitem').filter({ hasText: /^10 km:/ });
     await expect(tenK).toContainText('−0:59');
     await expect(tenK).not.toContainText('Estimated range');
-    await expect(tenK.getByText('(0:29 to 1:28)')).toHaveCount(0);
+    await expect(tenK.getByText('Range: 0:29 to 1:28')).toHaveCount(0);
+    await expect(page.getByText('The range assumes mostly fat lost')).toHaveCount(0);
     expect(await tenK.getByText('−0:59').evaluate((el) => getComputedStyle(el).color)).not.toBe(await page.locator('.text-primary-ink').first().evaluate((el) => getComputedStyle(el).color));
     await expect(page.getByText(SHARE_BLOCKED)).toBeVisible();
     await expect(saveButton(page)).toBeDisabled();
+    // The chart (and so the printout) draws no range either: the range assumes the healthy case, as on the cards.
+    const chart = page.getByRole('img', { name: /^Line chart of / });
+    await expect(chart).not.toHaveAttribute('aria-label', /Estimated range/);
+    await expect(chart.locator('path[stroke-dasharray]')).toHaveCount(0);
+    await expect(page.getByRole('switch', { name: 'Show range' })).toHaveCount(0);
+    await expect(page.getByText(/^Range: .* s\/km per kg$/)).toHaveCount(0);
+    await expect(page.getByText(/^The pace gain per kg lost is a rule of thumb/)).toBeVisible();
     expect(await brokenAriaReferences(page)).toEqual([]);
     // A later date and the image is back.
     await page.getByLabel('I want to get there by').fill(DATE_SUSTAINABLE);
     await expect(state(page)).toHaveText(NOT_LOWERED);
     await expect(saveButton(page)).toBeEnabled();
+    await expect(chart).toHaveAttribute('aria-label', /Estimated range at /);
+    await expect(page.getByRole('switch', { name: 'Show range' })).toBeChecked();
     await expect(pointer(page)).toHaveCount(0);
   });
 

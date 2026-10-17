@@ -33,9 +33,14 @@ const RACES = [
 
 const STRIPE = 'bg-[repeating-linear-gradient(90deg,var(--foreground)_0_8px,transparent_8px_16px)]';
 
-function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel, range, muted }: { chip: string; chipClass: string; sub: string; timeSec: number; time: string; saved: number; srLabel: string; range: { low: number; high: number } | null; muted: boolean }) {
+type Range = { low: number; high: number } | null;
+/** A range is only worth printing when there is a saving and the two ends read differently. */
+const rangeShown = (range: Range, saved: number): range is { low: number; high: number } =>
+  range !== null && saved > 0.5 && formatDelta(range.low) !== formatDelta(range.high);
+
+function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel, range, muted }: { chip: string; chipClass: string; sub: string; timeSec: number; time: string; saved: number; srLabel: string; range: Range; muted: boolean }) {
   const { t, speak } = useI18n();
-  const showRange = range !== null && saved > 0.5 && formatDelta(range.low) !== formatDelta(range.high);
+  const showRange = rangeShown(range, saved);
   return (
     <>
       <p className="sr-only">
@@ -76,6 +81,17 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
   const muted = trainingPointer === 'withheld';
   const rangeOf = (baseSec: number, metric: BandMetric) =>
     edges && !muted ? timeSavedRange(baseSec, bandValue(edges.conservative, metric, customKm), bandValue(edges.optimistic, metric, customKm)) : null;
+  const customPace = (row: ResultRow) => estimateRaceTimeSec(row.estimatedThresholdPaceSec ?? 0, customKm ?? 0);
+  const faces = [
+    ...RACES.map((race) => {
+      const baseSec = race.time(base) ?? 0;
+      const timeSec = race.time(sel) ?? 0;
+      return { key: race.key, custom: false, chip: race.key, chipClass: 'bg-foreground text-background', sub: t(race.long), timeSec, time: race.text(sel), saved: baseSec - timeSec, srLabel: t(race.long), range: rangeOf(baseSec, race.key) };
+    }),
+    ...(customKm !== null
+      ? [{ key: 'custom', custom: true, chip: customLabel, chipClass: 'bg-primary text-primary-foreground', sub: t('race.yours'), timeSec: customPace(sel), time: formatTime(customPace(sel)), saved: customPace(base) - customPace(sel), srLabel: customLabel, range: rangeOf(customPace(base), 'custom') }]
+      : []),
+  ];
   const sliderText =
     index === 0
       ? t('target.sliderNow', { weight: disp(sel.targetWeightKg, index), unit: labels.weight })
@@ -128,27 +144,15 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
       </div>
 
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {RACES.map((race) => (
-          <li key={race.key} className="@container relative overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4">
-            <RaceFace chip={race.key} chipClass="bg-foreground text-background" sub={t(race.long)} timeSec={race.time(sel) ?? 0} time={race.text(sel)} saved={(race.time(base) ?? 0) - (race.time(sel) ?? 0)} srLabel={t(race.long)} range={rangeOf(race.time(base) ?? 0, race.key)} muted={muted} />
+        {faces.map((f) => (
+          <li key={f.key} className={cn('@container relative overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4', f.custom && 'col-span-2 lg:col-span-4')}>
+            <RaceFace chip={f.chip} chipClass={f.chipClass} sub={f.sub} timeSec={f.timeSec} time={f.time} saved={f.saved} srLabel={f.srLabel} range={f.range} muted={muted} />
           </li>
         ))}
-        {customKm !== null && (
-          <li className="@container relative col-span-2 overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4 lg:col-span-4">
-            <RaceFace
-              chip={customLabel}
-              chipClass="bg-primary text-primary-foreground"
-              sub={t('race.yours')}
-              timeSec={estimateRaceTimeSec(sel.estimatedThresholdPaceSec ?? 0, customKm)}
-              time={formatTime(estimateRaceTimeSec(sel.estimatedThresholdPaceSec ?? 0, customKm))}
-              saved={estimateRaceTimeSec(base.estimatedThresholdPaceSec ?? 0, customKm) - estimateRaceTimeSec(sel.estimatedThresholdPaceSec ?? 0, customKm)}
-              srLabel={customLabel}
-              range={rangeOf(estimateRaceTimeSec(base.estimatedThresholdPaceSec ?? 0, customKm), 'custom')}
-              muted={muted}
-            />
-          </li>
-        )}
       </ul>
+
+      {/* What the range beside the saving assumes, at the cards themselves (the longer note is under the chart). */}
+      {faces.some((f) => rangeShown(f.range, f.saved)) && <p className="text-xs">{t('band.card.note')}</p>}
 
       <p className="flex gap-2 text-xs"><HeartPulse className="h-4 w-4 shrink-0 text-primary-ink" aria-hidden />{t('health.note')}</p>
     </section>

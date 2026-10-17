@@ -35,7 +35,7 @@ describe('training messages: structure', () => {
   it('have a message for every state, reason, note, history and field error the UI can show', () => {
     const wanted = [
       ...['same', 'reduced', 'withheld'].map((s) => `training.state.${s}`),
-      ...['same', 'flat', 'reduced'].map((s) => `training.summary.${s}`),
+      ...['same', 'flat', 'reduced', 'unchecked'].map((s) => `training.summary.${s}`),
       ...['known', 'unknown'].map((s) => `training.status.${s}`),
       ...Object.keys(REDUCED).map((r) => `training.reduced.${r}`),
       ...Object.keys(WITHHELD).filter((r) => r !== 'lowBmi').map((r) => `training.withheld.${r}`),
@@ -80,7 +80,7 @@ describe('training messages: structure', () => {
 
   it('only asks for placeholders that the card supplies', () => {
     const supplied: Record<string, string[]> = {
-      'training.summary': ['race', 'realistic', 'conservative', 'headline'],
+      'training.summary': ['race', 'realistic', 'conservative', 'headline', 'veryHigh', 'unit'],
       'training.status': ['risk', 'pct', 'km', 'unit'],
       'training.reduced.factor': ['max'],
       'training.note.assumedRate': ['pct'],

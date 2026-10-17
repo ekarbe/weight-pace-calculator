@@ -32,7 +32,7 @@ const STATE = {
 
 const HISTORY_ITEMS = ['new', 'some', 'veteran'] as const satisfies readonly TrainingHistory[];
 /** Fixed ids: there is exactly one Training card on the page, and the race cards link to #training. */
-const ID = { section: 'training', heading: 'training-heading', km: 'training-km', hint: 'training-km-hint', err: 'training-km-err', history: 'training-history' } as const;
+const ID = { section: 'training', heading: 'training-heading', km: 'training-km', hint: 'training-km-hint', err: 'training-km-err', history: 'training-history', historyHint: 'training-history-hint' } as const;
 
 /** Decimals needed to show a typed number as typed (at most two). */
 const decimals = (n: number) => (Number.isInteger(n) ? 0 : Number.isInteger(n * 10) ? 1 : 2);
@@ -75,6 +75,16 @@ export function TrainingCard({ result, input, units, weeklyKmText, history, fiel
     unit: metric ? 'km' : 'mi',
   };
 
+  const figures = explainerFigures({
+    units,
+    startKg: input.weightKg,
+    centralFactor: input.paceFactorSecPerKg ?? DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM,
+    baselinePaceSec: input.thresholdPaceMin * 60 + input.thresholdPaceSec,
+  });
+  const unit = metric ? 'km' : 'mi';
+  /** Printed distances: whole km, but miles keep the tenth they were rounded up to (31.1, 62.2). */
+  const dist = (v: number) => num(v, metric ? 0 : 1);
+
   // Round once to a whole second; the eye gets m:ss and a screen reader gets the same number as words.
   const summary = (fmt: (sec: number) => string) =>
     summaryKind && savings10k && rich(`training.summary.${summaryKind}`, {
@@ -82,22 +92,16 @@ export function TrainingCard({ result, input, units, weeklyKmText, history, fiel
       realistic: fmt(Math.round(savings10k.realistic)),
       conservative: fmt(Math.round(savings10k.conservative)),
       headline: fmt(Math.round(savings10k.headline)),
+      // The weekly distance from which the card lowers the figure; below it, distance changes no number.
+      veryHigh: dist(figures.veryHigh),
+      unit,
     });
 
   const withheldKey = withheld === 'lowBmi' ? (`training.withheld.lowBmi.${result.lowBmiAt ?? 'selected'}` as const) : withheld && (`training.withheld.${withheld}` as const);
 
   const error = fields.weeklyKmError;
-  const figures = explainerFigures({
-    units,
-    startKg: input.weightKg,
-    centralFactor: input.paceFactorSecPerKg ?? DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM,
-    baselinePaceSec: input.thresholdPaceMin * 60 + input.thresholdPaceSec,
-  });
   /** A factor with the decimals it needs: 2.0, 1.0, 3.0, but also 2.25. */
   const factor = (v: number) => num(v, Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? 1 : 2);
-  const unit = metric ? 'km' : 'mi';
-  /** Printed distances: whole km, but miles keep the tenth they were rounded up to (31.1, 62.2). */
-  const dist = (v: number) => num(v, metric ? 0 : 1);
   const how: [string, string][] = [
     [t('training.how.start', { central: factor(figures.central), lowest: factor(figures.lowest), ceiling: factor(figures.ceiling) }), 'start'],
     [t('training.how.check', { central: factor(figures.central), elasticity: num(figures.elasticityPct, 2) }), 'check'],
@@ -193,6 +197,7 @@ export function TrainingCard({ result, input, units, weeklyKmText, history, fiel
                   <Select value={history} onValueChange={(v) => onChange({ trainingHistory: v === 'none' ? '' : (v as TrainingHistory) })}>
                     <SelectTrigger
                       id={ID.history}
+                      aria-describedby={ID.historyHint}
                       className="w-full text-left whitespace-normal data-[size=default]:h-auto data-[size=default]:min-h-9 pointer-coarse:data-[size=default]:min-h-11 pointer-coarse:text-base *:data-[slot=select-value]:line-clamp-none"
                     >
                       <SelectValue placeholder={t('training.history.placeholder')} />
@@ -202,6 +207,7 @@ export function TrainingCard({ result, input, units, weeklyKmText, history, fiel
                       {HISTORY_ITEMS.map((h) => <SelectItem key={h} value={h}>{t(`training.history.${h}`)}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <p id={ID.historyHint} className="mt-1 text-xs text-muted-foreground">{t('training.history.hint')}</p>
                 </div>
               </div>
             </fieldset>

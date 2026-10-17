@@ -1,5 +1,5 @@
 import { test, expect } from './support/fixtures';
-import { SAMPLE, alerts, brokenAriaReferences, cardTime, choose, form, openApp, slider, waitForHydration } from './support/app';
+import { SAMPLE, alerts, brokenAriaReferences, cardTime, choose, form, openApp, raceCard, slider, waitForHydration } from './support/app';
 import type { Page } from '@playwright/test';
 
 const base = { g: 'female', h: '170', w: '64', bf: '22' };
@@ -103,6 +103,26 @@ test.describe('threshold pace from a recent race', () => {
     await expect(cardTime(page, 'Marathon')).toHaveText('03:00:00');
   });
 
+  test('a runner already under the BMI floor gets the entered time back as well, not the time at a heavier weight', async ({ page }) => {
+    // 170 cm: the BMI-20 floor is 57.8 kg. At 56 and 50 kg the table's only row is the entered weight, and it used to be 57.8 kg
+    // (25:17 and 26:14 for an entered 25:00, both labelled "same as now").
+    for (const w of ['56', '50']) {
+      await openApp(page, { params: { g: 'female', h: '170', w, pace: 'race', rd: '5k', rtm: '25', rts: '0' }, results: true });
+      // (The warning is in the collapsed notes.)
+      await expect(page.getByText(/is already at or below the lowest weight shown/)).toBeAttached();
+      await expect(cardTime(page, '5 km')).toHaveText('25:00');
+      await expect(raceCard(page, '5 km')).toContainText('baseline');
+      await expect(raceCard(page, '5 km')).toContainText('5 km: 25 minutes, same as now');
+      await expect(page.getByText(`${w}.0 kg (now)`)).toBeVisible();
+    }
+    // The same with a typed pace: a 5:00 threshold pace is a 23:45 5K at any weight under the floor.
+    await openApp(page, { params: { g: 'female', h: '170', w: '49', pm: '5', ps: '0' }, results: true });
+    await expect(cardTime(page, '5 km')).toHaveText('23:45');
+    await page.locator('summary', { hasText: /^Full table/ }).click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody tr').first().locator('td').nth(2)).toHaveText('5:00');
+  });
+
   test('bad times and distances are explained next to the field', async ({ page }) => {
     await openApp(page, { params: { ...base, pace: 'race', rd: '5k' } });
     await expect(page.getByText('Still needed: race time.')).toBeVisible();
@@ -177,6 +197,17 @@ test.describe('threshold pace from a recent race', () => {
     await form(page).units('kg · cm · km').click();
     await expect(page.getByLabel('Distance you ran (km)')).toHaveValue('8');
     await expect(derived(page)).toContainText('Estimated threshold pace: 4:38 /km');
+  });
+
+  test('a custom race distance typed with two decimals comes back unchanged from a round trip through miles', async ({ page }) => {
+    // 0.01 mi is 0.016 km, so 8.39 km used to come back as 8.38 km and move the pace from 4:05 to 4:06.
+    await openApp(page, { params: { g: 'male', h: '180', w: '75', pace: 'race', rd: 'custom', rdc: '8.39', rtm: '33', rts: '21' }, results: true });
+    await expect(derived(page)).toContainText('Estimated threshold pace: 4:05 /km');
+    await form(page).units('lb · in · mi').click();
+    await expect(page.getByLabel('Distance you ran (mi)')).toHaveValue('5.213');
+    await form(page).units('kg · cm · km').click();
+    await expect(page.getByLabel('Distance you ran (km)')).toHaveValue('8.39');
+    await expect(derived(page)).toContainText('Estimated threshold pace: 4:05 /km');
   });
 
   test('the typed pace is unaffected by the race fields while the typed source is selected', async ({ page }) => {
