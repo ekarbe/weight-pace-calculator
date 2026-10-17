@@ -18,6 +18,26 @@ const KNOWN_LIGHT_CONTRAST_DEFECTS = ['.text-destructive'];
 
 const FULL = { ...SAMPLE, td: DATE_BRISK, wk: '40', th: 'some' };
 
+/**
+ * Every state of the Training context card: [name, share-link parameters, steps that need the UI].
+ * The "too fast" label of the Timeline card is a known light-theme contrast defect (see above), so it is left out of
+ * the light scans that include it; the training card itself uses no destructive colour.
+ */
+const TRAINING_STATES: [string, Record<string, string>, ((page: Page) => Promise<void>)?][] = [
+  ['idle (nothing to compare)', SAMPLE, async (page) => { await slider(page).focus(); await page.keyboard.press('Home'); }],
+  ['idle (a change within day-to-day swings)', SAMPLE, async (page) => { await slider(page).focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight'); }],
+  ['matches the headline estimate', SAMPLE],
+  ['lowered: brisk pace', { ...SAMPLE, td: DATE_BRISK, wk: '40', th: 'new' }],
+  ['lowered: very high weekly running', { ...SAMPLE, wk: '100' }],
+  ['lowered: factor above the usual range', SAMPLE, async (page) => { await form(page).advanced.click(); await form(page).paceGain.fill('4'); }],
+  ['withheld: too fast', { ...SAMPLE, td: DATE_TOO_FAST, wk: '40' }],
+  ['withheld: brisk and heavy', { ...SAMPLE, td: DATE_BRISK, wk: '60' }],
+  ['withheld: current weight under the line', { g: 'male', h: '180', w: '60', pm: '4', ps: '0' }],
+  ['withheld: selected weight under the line', { g: 'male', h: '180', w: '66', pm: '4', ps: '0' }, async (page) => { await form(page).advanced.click(); await form(page).bmiFloor.fill('18.5'); }],
+  ['withheld: low body fat', { g: 'male', h: '180', w: '75', bf: '10', pm: '4', ps: '0' }, async (page) => { await slider(page).focus(); await page.keyboard.press('End'); }],
+  ['withheld: a mistyped distance', { ...SAMPLE, wk: '300' }],
+];
+
 // Desktop project only: states that look the same at any width. Language and viewport coverage is in a11y.spec.ts.
 for (const scheme of ['light', 'dark'] as const) {
   test.describe(`axe (WCAG 2.1 AA) in other states, ${scheme}`, () => {
@@ -76,6 +96,30 @@ for (const scheme of ['light', 'dark'] as const) {
       await openAllDetails(page);
       await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
     });
+
+    for (const [name, params, steps] of TRAINING_STATES) {
+      test(`training context: ${name}`, async ({ page }) => {
+        await openApp(page, { params, results: true });
+        await steps?.(page);
+        await expect(page.locator('section#training')).toBeVisible();
+        await openAllDetails(page);
+        await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
+        expect(await brokenAriaReferences(page)).toEqual([]);
+      });
+    }
+
+    // German and French run 30 to 40 % longer: the narrowest reflow width, with the state that carries the most text.
+    for (const lang of ['de', 'fr'] as const) {
+      for (const [name, params] of [['lowered', { ...SAMPLE, td: DATE_BRISK, wk: '40' }], ['withheld', { ...SAMPLE, td: DATE_TOO_FAST, wk: '60' }], ['a mistyped distance', { ...SAMPLE, wk: '300' }]] as const) {
+        test(`training context, ${lang} at 320 px: ${name}`, async ({ page }) => {
+          await page.setViewportSize({ width: 320, height: 640 });
+          await openApp(page, { lang, params, results: true });
+          await openAllDetails(page);
+          await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
+          expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+        });
+      }
+    }
 
     test('open select lists', async ({ page }) => {
       await openApp(page, { params: FULL, results: true });

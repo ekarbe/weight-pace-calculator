@@ -52,7 +52,9 @@ test.describe('print', () => {
     await expect(page.getByRole('heading', { name: 'Training context' })).toBeVisible();
     await expect(page.locator('tbody tr')).toHaveCount(14);
     await expect(page.getByText('Disclaimer: These calculations are estimates')).toBeVisible();
-    await expect(page.getByText('How this is worked out').locator('..')).toBeVisible();
+    // The training card's explainer is on screen only; the card itself (state, summary, scope) prints.
+    await expect(page.getByText('How this is worked out')).toBeHidden();
+    await expect(page.getByText('This card is written for adults.')).toBeVisible();
   });
 
   test('the printed stats list the scenario in the chosen units', async ({ page }) => {

@@ -80,5 +80,19 @@ test.describe('touch', () => {
     await expect(page.getByLabel('Threshold pace, minutes')).toHaveAttribute('inputmode', 'numeric');
     await expect(page.getByLabel(/^Custom race distance/)).toHaveAttribute('inputmode', 'decimal');
   });
+
+  test('the training fields are touch-sized and keep the numeric keyboard', async ({ page, hasTouch }) => {
+    test.skip(!hasTouch, 'touch screens only');
+    await openApp(page, { params: SAMPLE, results: true });
+    const km = page.getByLabel(/^Running per week/);
+    const since = page.getByRole('combobox', { name: 'How long have you run regularly?' });
+    await expect(km).toHaveAttribute('inputmode', 'decimal');
+    for (const field of [km, since]) {
+      await field.scrollIntoViewIfNeeded();
+      expect((await field.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      // 16 px stops mobile browsers from zooming the page when the field is focused.
+      expect(parseFloat(await field.evaluate((el) => getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+    }
+  });
 });
 
