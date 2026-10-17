@@ -16,6 +16,9 @@ export const BAND_LOW_FACTOR = 1;
 export const BAND_DEFAULT_FACTOR = 2;
 export const BAND_HIGH_FACTOR = 3;
 
+/** Weight loss, in kg, beyond which a constant gain per kg is increasingly optimistic (linear up to roughly this much). */
+export const BAND_LINEAR_LIMIT_KG = 10;
+
 /**
  * Factors of the two band edges. If the user's own factor lies outside [BAND_LOW_FACTOR, BAND_HIGH_FACTOR]
  * the band widens to include it, so the main line is never drawn outside its own range.

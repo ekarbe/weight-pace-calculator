@@ -4,7 +4,7 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { cn, formatPace, formatTime } from '@/lib/utils';
 import type { ResultRow } from '@/lib/calculations';
 import { estimateRaceTimeSec } from '@/lib/calculations';
-import { BAND_DEFAULT_FACTOR, bandValue, type Band, type BandPoint } from '@/lib/band';
+import { BAND_DEFAULT_FACTOR, BAND_LINEAR_LIMIT_KG, bandValue, type Band, type BandPoint } from '@/lib/band';
 import { kgToLb, secPerKmToSecPerMile, unitLabels, type UnitSystem } from '@/lib/units';
 import { useI18n } from '@/i18n/provider';
 
@@ -201,7 +201,7 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, 
           {fmt(geo.vals[index])}
         </text>
       </svg>
-      {band && <p className="mt-3 text-xs">{t('band.disclaimer', { low: band.lowFactor, high: band.highFactor, default: BAND_DEFAULT_FACTOR })}</p>}
+      {band && <p className="mt-3 text-xs">{t('band.disclaimer', { low: band.lowFactor, high: band.highFactor, default: BAND_DEFAULT_FACTOR, limit: dispW(BAND_LINEAR_LIMIT_KG), unit: labels.weight })}</p>}
     </section>
   );
 }
