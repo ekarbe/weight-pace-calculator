@@ -38,7 +38,7 @@ already have instead of the one Playwright installs (local use only).
 
 ## Speed
 
-The suite is CPU-bound (software-rendered Chromium), so its run time is the number of page loads and axe scans. 236
+The suite is CPU-bound (software-rendered Chromium), so its run time is the number of page loads and axe scans. 254
 tests take 1.5 to 2.6 minutes on 4 vCPUs, depending on the machine (4 workers; more workers do not help). To keep it from growing:
 
 - Where a test checks both themes it loads the page once and flips the emulated colour scheme (`inEachTheme`); opening
