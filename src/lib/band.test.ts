@@ -137,6 +137,47 @@ describe('calculateBand', () => {
         }
     });
 
+    it('keeps the order, as a zero-width band, when the entered weight is already below the BMI floor', () => {
+        // 170 cm at 50 kg is BMI 17.3: the table's only row is the heavier floor weight, so no weight is "lost".
+        for (const input of [
+            { ...base, gender: 'female' as const, heightCm: 170, weightKg: 50, thresholdPaceMin: 5, thresholdPaceSec: 0 },
+            { ...base, gender: 'male' as const, heightCm: 180, weightKg: 55, thresholdPaceMin: 4, thresholdPaceSec: 0, paceFactorSecPerKg: 3.5 },
+            { ...base, heightCm: 175, weightKg: 60, bmiFloor: 25 },
+        ]) {
+            const rows = calculateWeightPaceEstimates(input).resultsTable;
+            expect(rows[0].targetWeightKg).toBeGreaterThan(input.weightKg);
+            const band = calculateBand(input);
+            band.rows.forEach((r, i) => {
+                for (const m of METRICS) {
+                    const main = mainValue(rows[i], m, 15);
+                    expect(edgeValue(r.conservative, m, 15), `${m} row ${i}`).toBeGreaterThanOrEqual(main);
+                    expect(edgeValue(r.optimistic, m, 15), `${m} row ${i}`).toBeLessThanOrEqual(main);
+                    expect(edgeValue(r.conservative, m, 15)).toBe(main);
+                    expect(edgeValue(r.optimistic, m, 15)).toBe(main);
+                }
+            });
+        }
+    });
+
+    it('keeps conservative >= main >= optimistic over a sweep of inputs, including weights below the floor', () => {
+        let below = 0;
+        for (let w = 40; w <= 130; w += 3) {
+            for (const heightCm of [155, 170, 190]) {
+                for (const factor of [undefined, 0.5, 2, 3.5]) {
+                    const input: UserInput = { ...base, gender: 'female', heightCm, weightKg: w, thresholdPaceMin: 5, thresholdPaceSec: 12, paceFactorSecPerKg: factor };
+                    const rows = calculateWeightPaceEstimates(input).resultsTable;
+                    if (rows.length > 0 && rows[0].targetWeightKg > w) below++;
+                    calculateBand(input).rows.forEach((r, i) => {
+                        expect(r.conservative.paceSec).toBeGreaterThanOrEqual(rows[i].estimatedThresholdPaceSec!);
+                        expect(r.optimistic.paceSec).toBeLessThanOrEqual(rows[i].estimatedThresholdPaceSec!);
+                        expect(r.conservative.t10kSec).toBeGreaterThanOrEqual(r.optimistic.t10kSec);
+                    });
+                }
+            }
+        }
+        expect(below).toBeGreaterThan(10);
+    });
+
     it('never gets slower as weight drops, on either edge', () => {
         const band = calculateBand(base);
         for (let i = 1; i < band.rows.length; i++) {

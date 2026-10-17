@@ -15,7 +15,7 @@ import { calculateWeightPaceEstimates, DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM, DE
 import { calculateBand } from '@/lib/band';
 import { useI18n } from '@/i18n/provider';
 import type { MessageKey } from '@/i18n/messages/en';
-import { buildInput, buildTraining, type AdvancedState } from '@/lib/form';
+import { buildInput, buildTraining, convertWeeklyDistance, type AdvancedState } from '@/lib/form';
 import { convertRaceDistance } from '@/lib/race-result';
 import { decodeForm, emptyForm, encodeForm, type FormState } from '@/lib/share';
 import { computeTraining, trainingInputFor } from '@/lib/training';
@@ -65,7 +65,7 @@ export default function HomePage() {
   // One result for the whole page: the card shows it, the race cards point at it and the share image obeys it.
   const today = useMemo(() => new Date(), []);
   const trainingResult = useMemo(
-    () => (built.input && rows[index] ? computeTraining(trainingInputFor(built.input, rows[index], training, form.targetDate), today) : null),
+    () => (built.input && rows[index] ? computeTraining(trainingInputFor(built.input, rows[index], rows[0].targetWeightKg, training, form.targetDate), today) : null),
     [built.input, rows, index, training, form.targetDate, today],
   );
 
@@ -97,7 +97,7 @@ export default function HomePage() {
         paceSec,
         distance: convert(f.distance, toImp ? (n) => n / KM_PER_MILE : (n) => n * KM_PER_MILE),
         raceCustom: convertRaceDistance(f.raceCustom, toImp),
-        weeklyKm: convert(f.weeklyKm, toImp ? (n) => n / KM_PER_MILE : (n) => n * KM_PER_MILE),
+        weeklyKm: convertWeeklyDistance(f.weeklyKm, toImp),
       };
     });
     setSliderIndex(null);

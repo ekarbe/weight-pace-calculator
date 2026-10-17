@@ -72,6 +72,12 @@ function point(main: ResultRow, paceSec: number): BandPoint {
  * Conservative and optimistic estimates for every row of the main table, produced by the same model
  * (same weights, pace cap per sex) with the band's factors instead of the user's. Per row, and for
  * every metric: conservative time >= main time >= optimistic time, with equality at row 0.
+ *
+ * The edges are clamped to the main line. That changes nothing in the normal case, but when the entered weight
+ * is already below the BMI floor the table's only row is the heavier floor weight, "lost" weight is negative
+ * and a larger factor would make the pace slower, not faster. A band that says "might be faster" is
+ * meaningless there (and the underweight group is the one the page is most careful with), so such a row gets
+ * a zero-width band instead of an inverted one.
  */
 export function calculateBand(input: UserInput): Band {
     const userFactor = input.paceFactorSecPerKg ?? DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM;
@@ -90,9 +96,9 @@ export function calculateBand(input: UserInput): Band {
         rows: main.map((row, i) => {
             const mainPace = row.estimatedThresholdPaceSec ?? 0;
             return {
-                conservative: point(row, slow[i] ?? mainPace),
+                conservative: point(row, Math.max(mainPace, slow[i] ?? mainPace)),
                 // The model stops generating rows once the raw pace reaches zero; those weights are at the pace cap.
-                optimistic: point(row, fast[i] ?? Math.min(floor, mainPace)),
+                optimistic: point(row, Math.min(mainPace, fast[i] ?? Math.min(floor, mainPace))),
             };
         }),
     };

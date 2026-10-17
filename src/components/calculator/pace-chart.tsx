@@ -55,7 +55,9 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, 
   };
   const fmt = (v: number) => (active === 'pace' ? formatPace(v) : formatTime(v));
 
-  const bandOn = showRange && band !== null && band.rows.length === rows.length;
+  // No range to draw, switch or announce when the band has no width anywhere (e.g. the entered weight is below the BMI floor).
+  const bandUsable = band !== null && band.rows.length === rows.length && band.rows.some((r) => r.conservative.paceSec !== r.optimistic.paceSec);
+  const bandOn = showRange && bandUsable;
   const edge = (p: BandPoint) => {
     const v = bandValue(p, active, customKm);
     return active === 'pace' && units !== 'metric' ? secPerKmToSecPerMile(v) : v;
@@ -122,7 +124,7 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, 
         </div>
       </div>
 
-      {band && (
+      {band && bandUsable && (
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1">
           <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
             <input type="checkbox" role="switch" checked={showRange} onChange={(e) => setShowRange(e.target.checked)} className="h-4 w-4 cursor-pointer accent-primary" />

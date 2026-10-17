@@ -91,17 +91,17 @@ describe('deriveRacePace', () => {
     it('derives the pace in km for the preset distances', () => {
         const d = deriveRacePace(race5k);
         expect(d).toMatchObject({ distanceKm: 5, timeSec: 1350, missing: [], errors: {} });
-        expect(d.perKm).toBe(Math.round(1350 / 5 / 0.95));
-        expect(d.displaySec).toBe(d.perKm);
+        expect(d.perKm).toBeCloseTo(1350 / 5 / 0.95, 10);
+        expect(d.displaySec).toBe(Math.round(1350 / 5 / 0.95));
         expect(deriveRacePace({ ...race5k, raceDist: 'm', raceH: '3', raceM: '45', raceS: '0' }).distanceKm).toBe(42.195);
         expect(deriveRacePace({ ...race5k, raceDist: 'hm', raceH: '1', raceM: '45', raceS: '0' }).distanceKm).toBe(21.0975);
     });
-    it('reports the pace per mile in imperial units and feeds the calculator the equivalent per-km pace', () => {
+    it('shows the pace per mile in imperial units and feeds the calculator the same exact per-km pace as in metric', () => {
         const d = deriveRacePace({ ...race5k, units: 'imperial' });
         const exact = 1350 / 5 / 0.95;
         expect(d.displaySec).toBe(Math.round(exact * 1.609344));
-        expect(d.perKm).toBe(Math.round(d.displaySec! / 1.609344));
-        expect(Math.abs(d.perKm! - exact)).toBeLessThanOrEqual(1);
+        expect(d.perKm).toBe(deriveRacePace(race5k).perKm);
+        expect(d.perKm).toBeCloseTo(exact, 10);
     });
     it('reads a custom distance in the selected units', () => {
         expect(deriveRacePace({ ...race5k, raceDist: 'custom', raceCustom: '15' }).distanceKm).toBe(15);
@@ -121,9 +121,9 @@ describe('deriveRacePace', () => {
         expect(deriveRacePace({ ...race5k, raceDist: 'custom', raceCustom: '100' }).errors.raceDistance).toBeUndefined();
     });
     it('rejects implied threshold paces outside 2:00-12:00 per km', () => {
-        expect(deriveRacePace({ ...race5k, raceM: '9', raceS: '30' })).toMatchObject({ perKm: 120, errors: {} });
+        expect(deriveRacePace({ ...race5k, raceM: '9', raceS: '30' })).toMatchObject({ displaySec: 120, errors: {} });
         expect(deriveRacePace({ ...race5k, raceM: '9', raceS: '27' }).errors.raceTime).toBe('raceResult.err.pace.metric');
-        expect(deriveRacePace({ ...race5k, raceM: '57', raceS: '0' })).toMatchObject({ perKm: 720, errors: {} });
+        expect(deriveRacePace({ ...race5k, raceM: '57', raceS: '0' })).toMatchObject({ displaySec: 720, errors: {} });
         expect(deriveRacePace({ ...race5k, raceM: '57', raceS: '30' }).errors.raceTime).toBe('raceResult.err.pace.metric');
         expect(deriveRacePace({ ...race5k, units: 'imperial', raceM: '57', raceS: '30' }).errors.raceTime).toBe('raceResult.err.pace.imperial');
         const bad = deriveRacePace({ ...race5k, raceM: '2', raceS: '0' });
@@ -139,6 +139,18 @@ describe('deriveRacePace', () => {
             expect(Math.abs(deriveRacePace(imperial).perKm! - before), `${km} km as miles`).toBeLessThanOrEqual(1);
             expect(Math.abs(deriveRacePace(back).perKm! - before), `${km} km round trip`).toBeLessThanOrEqual(1);
             expect(back.raceCustom, `${km} km round trip text`).toBe(km);
+        }
+    });
+    it('does not round the pace that feeds the model, so the units cannot move any estimate', () => {
+        // Preset distances: the unit toggle changes nothing the model sees.
+        for (const raceDist of ['5k', '10k', 'hm', 'm'] as const) {
+            for (const [raceH, raceM, raceS] of [['', '22', '30'], ['', '48', '26'], ['1', '45', '0'], ['3', '0', '0'], ['4', '0', '0']]) {
+                const metric = { ...race5k, raceDist, raceH, raceM, raceS };
+                const a = deriveRacePace(metric);
+                const b = deriveRacePace({ ...metric, units: 'imperial' });
+                if (a.perKm === null) continue;
+                expect(b.perKm, `${raceDist} ${raceH}:${raceM}:${raceS}`).toBe(a.perKm);
+            }
         }
     });
 });
@@ -157,18 +169,33 @@ describe('convertRaceDistance', () => {
 });
 
 describe('buildInput in race mode', () => {
-    it('produces the derived threshold pace', () => {
+    it('produces the derived threshold pace, unrounded', () => {
         const { input, errors, missing } = buildInput(race5k, adv);
-        const perKm = Math.round(1350 / 5 / 0.95);
-        expect(input).toMatchObject({ heightCm: 180, weightKg: 80, thresholdPaceMin: Math.floor(perKm / 60), thresholdPaceSec: perKm % 60 });
+        const perKm = 1350 / 5 / 0.95;
+        expect(input).toMatchObject({ heightCm: 180, weightKg: 80, thresholdPaceMin: Math.floor(perKm / 60) });
+        expect(input!.thresholdPaceMin * 60 + input!.thresholdPaceSec).toBeCloseTo(perKm, 9);
         expect(errors).toEqual({});
         expect(missing).toEqual([]);
     });
-    it('feeds the results exactly like the same pace typed in', () => {
+    it('gives back the entered result in the row for no weight change, for every preset distance', () => {
+        const cases = [
+            ['5k', '', '25', '0', 'estimated5kTimeSec', 1500], ['10k', '', '48', '26', 'estimated10kTimeSec', 2906],
+            ['hm', '2', '10', '0', 'estimatedHmTimeSec', 7800], ['m', '3', '0', '0', 'estimatedMTimeSec', 10800], ['m', '4', '0', '0', 'estimatedMTimeSec', 14400],
+        ] as const;
+        for (const [raceDist, raceH, raceM, raceS, field, seconds] of cases) {
+            for (const units of ['metric', 'imperial'] as const) {
+                const input = buildInput({ ...race5k, units, height: units === 'metric' ? '180' : '70.9', weight: units === 'metric' ? '80' : '176.4', raceDist, raceH, raceM, raceS }, adv).input!;
+                const first = calculateWeightPaceEstimates(input).resultsTable[0];
+                expect(Math.round(first[field]!), `${raceDist} ${units}`).toBe(seconds);
+            }
+        }
+    });
+    it('feeds the results like the same pace typed in, to within a second per km', () => {
         const typed = buildInput({ ...base, paceMin: '4', paceSec: '44' }, adv).input!;
         const fromRace = buildInput(race5k, adv).input!;
-        expect(fromRace).toEqual(typed);
-        expect(calculateWeightPaceEstimates(fromRace)).toEqual(calculateWeightPaceEstimates(typed));
+        const sec = (i: typeof typed) => i.thresholdPaceMin * 60 + i.thresholdPaceSec;
+        expect(Math.abs(sec(fromRace) - sec(typed))).toBeLessThan(0.5);
+        expect(fromRace).toMatchObject({ gender: 'male', heightCm: 180, weightKg: 80 });
     });
     it('ignores the typed pace in race mode and the race fields in threshold mode', () => {
         const typed = { ...race5k, paceMin: '9', paceSec: '99' };

@@ -25,9 +25,13 @@ export interface RacePace {
     distanceKm: number | null;
     /** Finishing time in seconds, or null while missing or invalid. */
     timeSec: number | null;
-    /** Derived threshold pace in whole s/km, as it feeds the calculator, or null. */
+    /**
+     * Derived threshold pace in s/km, as it feeds the calculator, or null. Deliberately NOT rounded: the pace is
+     * the exact inverse of the race model, so the row for "no weight change" gives back the time that was entered,
+     * and toggling the units cannot move it.
+     */
     perKm: number | null;
-    /** The same pace in the user's units (s/km or s/mi), rounded to whole seconds. This is what the UI shows. */
+    /** The same pace in the user's units (s/km or s/mi), rounded to whole seconds. Display only: nothing is computed from it. */
     displaySec: number | null;
     /** Fields that are empty (not an error yet). */
     missing: ('raceDistance' | 'raceTime')[];
@@ -76,13 +80,13 @@ export function deriveRacePace(form: RaceFormFields): RacePace {
 
     if (out.distanceKm !== null && out.timeSec !== null) {
         const exact = thresholdPaceFromRace(out.timeSec, out.distanceKm);
-        // Round in the user's units first so the shown pace feeds the results exactly like a typed one would.
         const displaySec = Math.round(metric ? exact : exact * KM_PER_MILE);
-        const perKm = Math.round(metric ? displaySec : displaySec / KM_PER_MILE);
-        if (perKm < MIN_RACE_THRESHOLD_SEC_PER_KM || perKm > MAX_RACE_THRESHOLD_SEC_PER_KM) {
+        // The plausible range is judged on the pace as shown, so a pace that reads 2:00 or 12:00 is accepted.
+        const shownKm = Math.round(metric ? displaySec : displaySec / KM_PER_MILE);
+        if (shownKm < MIN_RACE_THRESHOLD_SEC_PER_KM || shownKm > MAX_RACE_THRESHOLD_SEC_PER_KM) {
             out.errors.raceTime = metric ? 'raceResult.err.pace.metric' : 'raceResult.err.pace.imperial';
         } else {
-            out.perKm = perKm;
+            out.perKm = exact;
             out.displaySec = displaySec;
         }
     }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm } from './units';
-import { buildTraining } from './form';
+import { KM_PER_MILE, cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm } from './units';
+import { buildTraining, convertWeeklyDistance } from './form';
+import { classifyLoad } from './training';
 import { decodeForm, emptyForm, encodeForm } from './share';
 import { formatPace, formatTime } from './utils';
 
@@ -77,5 +78,51 @@ describe('formatting', () => {
     it('never renders :60', () => {
         expect(formatPace(299.6)).toBe('5:00');
         expect(formatTime(3599.7)).toBe('01:00:00');
+    });
+});
+
+describe('convertWeeklyDistance (the unit toggle)', () => {
+    const tier = (text: string, units: 'metric' | 'imperial') => {
+        const f = buildTraining({ ...emptyForm, units, weeklyKm: text });
+        return f.weeklyKmError ? 'invalid' : classifyLoad(f.weeklyKm);
+    };
+
+    it('keeps 100 km very high and 50 km high across the toggle, and brings the typed value back', () => {
+        expect(convertWeeklyDistance('100', true)).toBe('62.14');
+        expect(tier('62.14', 'imperial')).toBe('veryHigh');
+        expect(convertWeeklyDistance('62.14', false)).toBe('100');
+        expect(convertWeeklyDistance('50', true)).toBe('31.07');
+        expect(tier('31.07', 'imperial')).toBe('high');
+        expect(convertWeeklyDistance('31.07', false)).toBe('50');
+        expect(convertWeeklyDistance('40', true)).toBe('24.85');
+        expect(convertWeeklyDistance('24.85', false)).toBe('40');
+    });
+    it('leaves a blank or unreadable value alone', () => {
+        for (const v of ['', ' ', 'abc']) {
+            expect(convertWeeklyDistance(v, true)).toBe(v);
+            expect(convertWeeklyDistance(v, false)).toBe(v);
+        }
+    });
+    it('never moves the load tier, or the validity of the entry, for any distance with up to two decimals', () => {
+        let checked = 0;
+        for (let h = 0; h <= 26000; h++) {
+            const km = String(h / 100);
+            const mi = String(Math.round((h / 100 / KM_PER_MILE) * 100) / 100);
+            const there = convertWeeklyDistance(km, true);
+            expect(tier(there, 'imperial'), `${km} km -> ${there} mi`).toBe(tier(km, 'metric'));
+            const back = convertWeeklyDistance(mi, false);
+            expect(tier(back, 'metric'), `${mi} mi -> ${back} km`).toBe(tier(mi, 'imperial'));
+            checked += 2;
+        }
+        expect(checked).toBe(52002);
+    });
+    it('returns to the typed text for whole and one-decimal kilometres and for whole miles', () => {
+        for (let t = 0; t <= 2500; t++) {
+            const km = String(t / 10);
+            expect(convertWeeklyDistance(convertWeeklyDistance(km, true), false), `${km} km`).toBe(km);
+        }
+        for (let mi = 0; mi <= 155; mi++) {
+            expect(convertWeeklyDistance(convertWeeklyDistance(String(mi), false), true), `${mi} mi`).toBe(String(mi));
+        }
     });
 });

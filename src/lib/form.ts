@@ -1,9 +1,9 @@
 import type { UserInput } from './calculations';
-import type { FormState } from './share';
+import { emptyForm, type FormState } from './share';
 import { MAX_CUSTOM_DISTANCE_KM, MIN_CUSTOM_DISTANCE_KM } from './calculations';
-import { KM_PER_MILE, inToCm, lbToKg, secPerMileToSecPerKm } from './units';
+import { KM_PER_MILE, inToCm, lbToKg, secPerMileToSecPerKm, type UnitSystem } from './units';
 import { deriveRacePace, type RaceErrorKey } from './race-result';
-import { TRAINING, TRAINING_HISTORIES, type TrainingHistory } from './training';
+import { TRAINING, TRAINING_HISTORIES, classifyLoad, type TrainingHistory } from './training';
 
 export interface AdvancedState {
     paceFactor: string;
@@ -129,4 +129,37 @@ export function buildTraining(form: FormState): TrainingFields {
         if (km <= TRAINING.WEEKLY_KM_MAX + 1e-9) return { weeklyKm: km, weeklyKmError: null, history };
     }
     return { weeklyKm: null, weeklyKmError: metric ? 'training.err.weeklyKm.metric' : 'training.err.weeklyKm.imperial', history };
+}
+
+/** What a typed weekly distance means to the Training card: invalid, not entered, or one of the load tiers. */
+const weeklyClass = (text: string, units: UnitSystem) => {
+    const f = buildTraining({ ...emptyForm, units, weeklyKm: text });
+    return f.weeklyKmError ? 'invalid' : classifyLoad(f.weeklyKm);
+};
+
+const hundredths = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Converts the weekly distance for the unit toggle. The tier of the load (and whether the entry is valid) is a safety
+ * input, so a display-unit toggle must never move it: 100 km is 62.1371 mi, and a one-decimal "62.1" would read back as
+ * 99.94 km, just under the very-high line. Miles keep two decimals; kilometres snap to one decimal when that is within
+ * the rounding error of a two-decimal mile value (40 km -> 24.85 mi -> 40 km, not 39.99). If the tidy text still lands
+ * in another tier, the nearest hundredth that keeps the tier is used.
+ */
+export function convertWeeklyDistance(value: string, toImperial: boolean): string {
+    const n = parseFloat(value);
+    if (!Number.isFinite(n)) return value;
+    const [from, to]: UnitSystem[] = toImperial ? ['metric', 'imperial'] : ['imperial', 'metric'];
+    const exact = toImperial ? n / KM_PER_MILE : n * KM_PER_MILE;
+    const tenth = Math.round(exact * 10) / 10;
+    const base = hundredths(exact);
+    const candidates = [
+        ...(!toImperial && Math.abs(tenth - exact) <= 0.005 * KM_PER_MILE ? [tenth] : []),
+        base,
+        hundredths(base + 0.01),
+        hundredths(base - 0.01),
+    ];
+    const want = weeklyClass(value, from);
+    const kept = candidates.find((c) => weeklyClass(String(c), to) === want);
+    return String(kept ?? base);
 }

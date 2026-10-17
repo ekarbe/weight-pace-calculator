@@ -15,6 +15,10 @@ import { KM_PER_MILE, kgToLb, type UnitSystem } from './units';
  * signs off every ILLUSTRATIVE constant and the support wording; (2) a human opens and checks any literature the
  * rules lean on (none was verified while this was written, which is why the UI cites no source and shows no
  * literature number); (3) native speakers review the de/es/fr withheld, help, signs, scope and pointer strings.
+ * STATUS: not met. No sign-off is recorded anywhere. Until it is, the card says what it is (a qualifier that can only
+ * lower an estimate or hold it back, not a forecast of what training will give) and states in plain sight, outside the
+ * "How this is worked out" panel and also on paper, that its limits are unchecked rules of thumb (`training.caveat`).
+ * Record the sign-off here (who, when, which constants) before presenting the card as anything more.
  */
 export interface TrainingConstants {
     /** SHARED (band): the lowest pace gain per kg shown (s/km per kg). If the user's own factor is lower, theirs is used. */
@@ -94,6 +98,12 @@ export interface TrainingInput {
     startKg: number;
     /** Selected row's weight. */
     targetKg: number;
+    /**
+     * The table's first weight: the start the Timeline card measures its rate from (the entered weight rounded to
+     * 0.1 kg). The pace of weight change is taken from this and `targetKg`, exactly the numbers the Timeline uses,
+     * so the two cards cannot put the same plan in different classes. Defaults to `startKg`.
+     */
+    rateStartKg?: number;
     heightCm: number;
     /** Entered threshold pace, s/km. */
     baselinePaceSec: number;
@@ -118,7 +128,11 @@ export interface TrainingResult {
     showHelp: boolean;
     /** Whether the "signs worth raising with a doctor" line is shown: with the help line, or when the figure is visibly lowered. */
     showSigns: boolean;
-    /** True when the outputs that leave the page (the share image) must not be made for this scenario. */
+    /**
+     * True when the outputs that leave the page (the share image) must not be made for this scenario: when no estimate
+     * is shown, and also when the estimate is lowered, because the picture would carry the higher headline figure
+     * (and be read without the card that qualifies it). It is true exactly when `pointer` is not 'none'.
+     */
     blocksOutputs: boolean;
     pointer: TrainingPointer;
     /** Set for 'full', 'tooFast' and 'fastAndHeavy': scenario descriptors, not outcome numbers. */
@@ -155,8 +169,8 @@ export function classifyLoad(km: number | null): LoadTier {
 }
 
 /**
- * The user's own pace of weight change (the same planByDate and classes as the Timeline card), or the
- * sustainable rate when no valid, future date is set.
+ * The user's own pace of weight change (the same planByDate and classes as the Timeline card, and the caller
+ * passes the same start and lost weight the Timeline does), or the sustainable rate when no valid, future date is set.
  */
 export function resolveLossRate(startKg: number, lostKg: number, targetISO: string, today: Date): LossRate {
     const p = planByDate(startKg, lostKg, targetISO, today);
@@ -236,7 +250,9 @@ export function computeTraining(i: TrainingInput, today: Date): TrainingResult {
 
     if (i.rowUnhealthyFat) return withheld('lowBodyFat');
 
-    const rate = resolveLossRate(S, L, i.targetDate, today);
+    // Not S and L: the Timeline works from the 0.1 kg table weights, and a hair of difference can cross a class limit.
+    const R = positive(i.rateStartKg ?? NaN) ? i.rateStartKg! : S;
+    const rate = resolveLossRate(R, R - T, i.targetDate, today);
     const load = classifyLoad(i.weeklyKmInvalid ? null : i.weeklyKm);
     if (rate.risk === 'aggressive') return withheld('tooFast', { rate, load });
     // Never fall back to 'unknown' or 0: the invalid value might have been the heavy one.
@@ -277,6 +293,7 @@ export function computeTraining(i: TrainingInput, today: Date): TrainingResult {
         notes,
         showSigns: reduced,
         pointer: reduced ? 'reduced' : 'none',
+        blocksOutputs: reduced,
     });
 }
 
@@ -334,16 +351,21 @@ export function explainerFigures(
     };
 }
 
-/** Maps the calculator's input and the selected table row to what `computeTraining` needs. */
+/**
+ * Maps the calculator's input and the selected table row to what `computeTraining` needs.
+ * `tableStartKg` is the weight of the table's first row, which the Timeline card starts from.
+ */
 export function trainingInputFor(
     input: UserInput,
     row: ResultRow,
+    tableStartKg: number,
     fields: { weeklyKm: number | null; weeklyKmError: string | null },
     targetDate: string,
 ): TrainingInput {
     const baselinePaceSec = input.thresholdPaceMin * 60 + input.thresholdPaceSec;
     return {
         startKg: input.weightKg,
+        rateStartKg: tableStartKg,
         targetKg: row.targetWeightKg,
         heightCm: input.heightCm,
         baselinePaceSec,

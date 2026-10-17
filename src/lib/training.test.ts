@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { calculateWeightPaceEstimates, type UserInput } from './calculations';
-import { classifyRate, planByDate } from './plan';
+import { MAX_PCT_PER_WEEK, SUSTAINABLE_PCT_PER_WEEK, classifyRate, dateAtRate, planByDate } from './plan';
+import { inToCm, lbToKg } from './units';
 import {
     TRAINING, ceilTenth, chooseSummary, classifyLoad, computeTraining, explainerFigures, impliedElasticityPct, lowestFactor,
     raceSavingSec, resolveLossRate, trainingInputFor, type TrainingInput, type TrainingResult,
@@ -137,7 +138,7 @@ describe('worked examples', () => {
         expect(r.showSigns).toBe(true);
         expect(r.showHelp).toBe(false);
         expect(r.pointer).toBe('reduced');
-        expect(r.blocksOutputs).toBe(false);
+        expect(r.blocksOutputs).toBe(true); // the picture would show the higher headline figure
         expect(chooseSummary(r)).toBe('reduced');
     });
 
@@ -554,11 +555,39 @@ describe('integration with the calculator', () => {
     it('uses the entered weight, not the heavier floor row, as the starting point', () => {
         const rows = calculateWeightPaceEstimates(user).resultsTable;
         expect(rows[0].targetWeightKg).toBeGreaterThan(user.weightKg); // the floor quirk
-        const r = computeTraining(trainingInputFor(user, rows[0], none, ''), today);
+        const r = computeTraining(trainingInputFor(user, rows[0], rows[0].targetWeightKg, none, ''), today);
         expect(r).toMatchObject({ withheld: 'lowBmi', lowBmiAt: 'current', blocksOutputs: false, pointer: 'none', showHelp: true });
         // Starting from rows[0] instead would have hidden the problem.
-        const wrong = { ...trainingInputFor(user, rows[0], none, ''), startKg: rows[0].targetWeightKg };
+        const wrong = { ...trainingInputFor(user, rows[0], rows[0].targetWeightKg, none, ''), startKg: rows[0].targetWeightKg };
         expect(computeTraining(wrong, today).display).toBe('idle');
+    });
+
+    it('puts the pace of weight change in the same class as the Timeline card, for imperial entries too', () => {
+        const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        let compared = 0;
+        for (let lb = 120; lb <= 260; lb += 1) {
+            for (const inches of [64, 70, 76]) {
+                const input: UserInput = { ...user, weightKg: lbToKg(lb), heightCm: inToCm(inches), bmiFloor: 20 };
+                const rows = calculateWeightPaceEstimates(input).resultsTable;
+                for (let i = 2; i < Math.min(rows.length, 40); i += 3) {
+                    // What the Timeline card works from: the table's 0.1 kg weights.
+                    const startKg = rows[0].targetWeightKg;
+                    const lostKg = startKg - rows[i].targetWeightKg;
+                    if (lostKg < 0.25) continue;
+                    // The dates the Timeline itself suggests, at the two class limits, where a hair of difference decides the class.
+                    for (const pct of [SUSTAINABLE_PCT_PER_WEEK, MAX_PCT_PER_WEEK]) {
+                        const targetDate = iso(dateAtRate(startKg, lostKg, today, pct)!.date);
+                        const timeline = planByDate(startKg, lostKg, targetDate, today)!;
+                        const r = computeTraining(trainingInputFor(input, rows[i], rows[0].targetWeightKg, none, targetDate), today);
+                        if (!r.rate) continue;
+                        compared++;
+                        expect(r.rate.pct, `${lb} lb, ${inches} in, row ${i}, ${pct}%`).toBe(timeline.pctPerWeek);
+                        expect(r.rate.risk, `${lb} lb, ${inches} in, row ${i}, ${pct}%`).toBe(timeline.risk);
+                    }
+                }
+            }
+        }
+        expect(compared).toBeGreaterThan(1000);
     });
 
     it('never shows a figure below the BMI line, even when the Advanced floor allows it, and blocks the scenario', () => {
@@ -570,7 +599,7 @@ describe('integration with the calculator', () => {
                     const input: UserInput = { ...user, gender, heightCm, weightKg, bmiFloor: 18.5 };
                     const rows = calculateWeightPaceEstimates(input).resultsTable;
                     for (const row of rows) {
-                        const r = computeTraining(trainingInputFor(input, row, none, ''), today);
+                        const r = computeTraining(trainingInputFor(input, row, rows[0].targetWeightKg, none, ''), today);
                         const bmi = Math.min(weightKg, row.targetWeightKg) / (heightCm / 100) ** 2;
                         if (bmi < TRAINING.BMI_FLOOR - TRAINING.BMI_TOLERANCE) {
                             withheldRows++;
@@ -596,7 +625,7 @@ describe('integration with the calculator', () => {
             const rows = calculateWeightPaceEstimates(input).resultsTable;
             for (const i of [2, 5, 9]) {
                 if (!rows[i]) continue;
-                const r = computeTraining(trainingInputFor(input, rows[i], none, ''), today);
+                const r = computeTraining(trainingInputFor(input, rows[i], rows[0].targetWeightKg, none, ''), today);
                 if (r.display !== 'full') continue;
                 const cards = rows[0].estimated10kTimeSec! - rows[i].estimated10kTimeSec!;
                 expect(r.savings10k!.headline).toBeCloseTo(cards, 6);
@@ -612,7 +641,7 @@ describe('integration with the calculator', () => {
         const capped = rows.find((r) => r.paceLimited)!;
         expect(capped).toBeDefined();
         for (const targetDate of ['', dateIn(60)]) {
-            const r = computeTraining(trainingInputFor(input, capped, none, targetDate), today);
+            const r = computeTraining(trainingInputFor(input, capped, rows[0].targetWeightKg, none, targetDate), today);
             expect(r.display).toBe('full');
             expect(r.gains!.headline).toBe(10); // 170 s/km down to the 160 s/km limit
             expect(r.gains!.realistic).toBeLessThanOrEqual(10);
@@ -623,19 +652,19 @@ describe('integration with the calculator', () => {
     it('is hidden for a runner already faster than the model’s limit', () => {
         const input: UserInput = { ...user, heightCm: 180, weightKg: 75, thresholdPaceMin: 2, thresholdPaceSec: 30 };
         const rows = calculateWeightPaceEstimates(input).resultsTable;
-        expect(computeTraining(trainingInputFor(input, rows[6], none, ''), today).display).toBe('hidden');
+        expect(computeTraining(trainingInputFor(input, rows[6], rows[0].targetWeightKg, none, ''), today).display).toBe('hidden');
     });
 
     it('maps the row flag, the invalid field and the default factor', () => {
         const rows = calculateWeightPaceEstimates({ ...user, weightKg: 80, heightCm: 180 }).resultsTable;
-        const i = trainingInputFor({ ...user, paceFactorSecPerKg: undefined }, { ...rows[4], isPotentiallyUnhealthyFat: true }, { weeklyKm: null, weeklyKmError: 'training.err.weeklyKm.metric' }, dateIn(10));
+        const i = trainingInputFor({ ...user, paceFactorSecPerKg: undefined }, { ...rows[4], isPotentiallyUnhealthyFat: true }, rows[0].targetWeightKg, { weeklyKm: null, weeklyKmError: 'training.err.weeklyKm.metric' }, dateIn(10));
         expect(i).toMatchObject({ centralFactor: 2, rowUnhealthyFat: true, weeklyKmInvalid: true, targetDate: dateIn(10), baselinePaceSec: 300 });
     });
 
     it('does not take the running history as an input: it cannot change a number', () => {
         const rows = calculateWeightPaceEstimates({ ...user, weightKg: 80, heightCm: 180 }).resultsTable;
         const inputs = (['', 'new', 'some', 'veteran'] as const).map((history) =>
-            trainingInputFor({ ...user, weightKg: 80, heightCm: 180 }, rows[6], { weeklyKm: 30, weeklyKmError: null, history } as never, dateIn(42)));
+            trainingInputFor({ ...user, weightKg: 80, heightCm: 180 }, rows[6], rows[0].targetWeightKg, { weeklyKm: 30, weeklyKmError: null, history } as never, dateIn(42)));
         for (const i of inputs) expect(i).toEqual(inputs[0]);
         expect(Object.keys(inputs[0]).some((k) => /histor|experience|years/i.test(k))).toBe(false);
         const results = inputs.map((i) => computeTraining(i, today));
@@ -684,8 +713,10 @@ describe('properties', () => {
             // The outputs that leave the page, and the pointer, follow the state.
             const typo = r.withheld === 'inputError';
             const noScenario = r.withheld === 'lowBmi' && input.startKg - input.targetKg < TRAINING.UNCHANGED_KG - eps;
-            expect(r.blocksOutputs, JSON.stringify(input)).toBe(r.display === 'withheld' && !typo && !noScenario);
+            expect(r.blocksOutputs, JSON.stringify(input)).toBe(r.display === 'withheld' ? !typo && !noScenario : r.reduced);
             expect(r.pointer).toBe(r.display === 'withheld' ? (r.blocksOutputs ? 'withheld' : 'none') : r.reduced ? 'reduced' : 'none');
+            // One rule for the card, the pointer and the image: whenever the card says anything but "matches", no image is made.
+            expect(r.blocksOutputs, JSON.stringify(input)).toBe(r.pointer !== 'none');
             expect(r.showHelp).toBe(r.display === 'withheld' && !typo);
             expect(r.showSigns).toBe(r.display === 'withheld' ? !typo : r.reduced);
 
