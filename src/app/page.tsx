@@ -18,6 +18,7 @@ import type { MessageKey } from '@/i18n/messages/en';
 import { buildInput, buildTraining, type AdvancedState } from '@/lib/form';
 import { convertRaceDistance } from '@/lib/race-result';
 import { decodeForm, emptyForm, encodeForm, type FormState } from '@/lib/share';
+import { computeTraining, trainingInputFor } from '@/lib/training';
 import { KM_PER_MILE, cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm, type UnitSystem } from '@/lib/units';
 
 const round1 = (n: number) => String(Math.round(n * 10) / 10);
@@ -60,6 +61,13 @@ export default function HomePage() {
     return best;
   }, [rows]);
   const index = Math.min(sliderIndex ?? defaultIndex, Math.max(rows.length - 1, 0));
+
+  // One result for the whole page: the card shows it, the race cards point at it and the share image obeys it.
+  const today = useMemo(() => new Date(), []);
+  const trainingResult = useMemo(
+    () => (built.input && rows[index] ? computeTraining(trainingInputFor(built.input, rows[index], training, form.targetDate), today) : null),
+    [built.input, rows, index, training, form.targetDate, today],
+  );
 
   const change = (patch: Partial<FormState>) => {
     setForm((f) => ({ ...f, ...patch }));
@@ -130,11 +138,11 @@ export default function HomePage() {
             {results && rows.length > 0 ? (
               <>
                 <PrintInputs form={form} adv={adv} startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} />
-                <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
-                <ShareImageCard rows={rows} index={index} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} />
+                <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} band={band} trainingPointer={trainingResult?.pointer} />
+                <ShareImageCard rows={rows} index={index} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} trainingBlocked={trainingResult?.blocksOutputs} />
                 <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
                 <PlanCard startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} units={form.units} targetDate={form.targetDate} onDate={(d) => setForm((f) => ({ ...f, targetDate: d }))} />
-                {built.input && <TrainingCard input={built.input} row={rows[index]} units={form.units} targetDate={form.targetDate} weeklyKmText={form.weeklyKm} history={form.trainingHistory} fields={training} onChange={(p) => setForm((f) => ({ ...f, ...p }))} />}
+                {built.input && trainingResult && <TrainingCard result={trainingResult} input={built.input} units={form.units} weeklyKmText={form.weeklyKm} history={form.trainingHistory} fields={training} onChange={(p) => setForm((f) => ({ ...f, ...p }))} />}
                 <ResultsTable rows={rows} warnings={results.warnings} units={form.units} enteredWeight={form.weight} selected={index} />
                 <PrintButton />
               </>

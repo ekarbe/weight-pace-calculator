@@ -1,11 +1,12 @@
 'use client';
 
-import { useId } from 'react';
-import { AlertTriangle, HeartPulse } from 'lucide-react';
+import { useId, type MouseEvent } from 'react';
+import { AlertTriangle, EyeOff, HeartPulse, Info } from 'lucide-react';
 import { cn, formatDelta, formatPace, formatTime } from '@/lib/utils';
 import { estimateRaceTimeSec, type ResultRow } from '@/lib/calculations';
 import { bandValue, timeSavedRange, type Band, type BandMetric } from '@/lib/band';
 import { kgToLb, secPerKmToSecPerMile, unitLabels, type UnitSystem } from '@/lib/units';
+import type { TrainingPointer } from '@/lib/training';
 import { useI18n } from '@/i18n/provider';
 import type { MessageKey } from '@/i18n/messages/en';
 
@@ -19,6 +20,8 @@ interface Props {
   customKm: number | null;
   customLabel: string;
   band: Band | null;
+  /** What the Training context card (further down the page) says about this scenario. */
+  trainingPointer?: TrainingPointer;
 }
 
 const RACES = [
@@ -53,7 +56,7 @@ function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel, range }
   );
 }
 
-export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm, customLabel, band }: Props) {
+export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm, customLabel, band, trainingPointer = 'none' }: Props) {
   const { t, num, speak } = useI18n();
   const headingId = useId();
   const labels = unitLabels(units);
@@ -113,6 +116,8 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
             </span>
           </div>
         )}
+
+        {trainingPointer !== 'none' && <TrainingPointerLine kind={trainingPointer} />}
       </div>
 
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -139,6 +144,24 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
 
       <p className="flex gap-2 text-xs"><HeartPulse className="h-4 w-4 shrink-0 text-primary-ink" aria-hidden />{t('health.note')}</p>
     </section>
+  );
+}
+
+/** Tells the reader that the card further down qualifies, or withholds, the figures above it. */
+function TrainingPointerLine({ kind }: { kind: 'reduced' | 'withheld' }) {
+  const { t } = useI18n();
+  const Icon = kind === 'reduced' ? Info : EyeOff;
+  const jump = (e: MouseEvent<HTMLAnchorElement>) => {
+    // No hash in the address bar (it would not survive the share link anyway): scroll, then move focus to the heading.
+    e.preventDefault();
+    document.getElementById('training')?.scrollIntoView({ block: 'start' });
+    document.getElementById('training-heading')?.focus({ preventScroll: true });
+  };
+  return (
+    <p data-testid="training-pointer" className="mt-4 flex gap-2 text-sm">
+      <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', kind === 'reduced' ? 'text-muted-foreground' : 'text-amber-800 dark:text-amber-400')} aria-hidden />
+      <a href="#training" onClick={jump} className="font-medium text-foreground underline underline-offset-2">{t(`training.pointer.${kind}`)}</a>
+    </p>
   );
 }
 

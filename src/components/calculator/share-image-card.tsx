@@ -18,6 +18,8 @@ interface Props {
   enteredWeight: string;
   customKm: number | null;
   customLabel: string;
+  /** True while the Training context card shows no estimate for this scenario: no picture may be made of it. */
+  trainingBlocked?: boolean;
 }
 
 type Status = { kind: 'saved' | 'failed' | 'shareFailed'; for: ShareBuild | null };
@@ -40,7 +42,7 @@ async function paint(canvas: HTMLCanvasElement, built: ShareBuild) {
   paintShareImage(ctx, layoutShareImage(built.content, makeMeasure(ctx, family)), family);
 }
 
-export function ShareImageCard({ rows, index, units, enteredWeight, customKm, customLabel }: Props) {
+export function ShareImageCard({ rows, index, units, enteredWeight, customKm, customLabel, trainingBlocked = false }: Props) {
   const i18n = useI18n();
   const { t } = i18n;
   const id = useId();
@@ -54,10 +56,11 @@ export function ShareImageCard({ rows, index, units, enteredWeight, customKm, cu
 
   const base = rows[0];
   const sel = rows[index];
-  const blocked = sel ? shareBlockReason(sel) !== null : false;
+  const flagged = sel ? shareBlockReason(sel) !== null : false;
+  const blocked = flagged || trainingBlocked;
   const built = useMemo(
-    () => (base && sel ? buildShareContent({ base, sel, units, customKm, customLabel, includeWeights, enteredWeight, url, i18n }) : null),
-    [base, sel, units, customKm, customLabel, includeWeights, enteredWeight, url, i18n],
+    () => (base && sel ? buildShareContent({ base, sel, units, customKm, customLabel, includeWeights, enteredWeight, url, i18n, trainingBlocked }) : null),
+    [base, sel, units, customKm, customLabel, includeWeights, enteredWeight, url, i18n, trainingBlocked],
   );
 
   useEffect(() => {
@@ -156,7 +159,7 @@ export function ShareImageCard({ rows, index, units, enteredWeight, customKm, cu
           className="mt-4 block h-auto w-full rounded-2xl border bg-muted"
         />
       ) : blocked ? (
-        <p id={blockedId} className="mt-4 rounded-2xl border-2 border-dashed p-4 text-sm">{t('shareImage.blocked')}</p>
+        <p id={blockedId} className="mt-4 rounded-2xl border-2 border-dashed p-4 text-sm">{flagged ? t('shareImage.blocked') : t('training.output.shareBlocked')}</p>
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-3">

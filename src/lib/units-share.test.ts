@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cmToIn, inToCm, kgToLb, lbToKg, secPerKmToSecPerMile, secPerMileToSecPerKm } from './units';
+import { buildTraining } from './form';
 import { decodeForm, emptyForm, encodeForm } from './share';
 import { formatPace, formatTime } from './utils';
 
@@ -34,6 +35,34 @@ describe('share', () => {
         expect(decodeForm('th=NEW').trainingHistory).toBe('');
         expect(decodeForm('th=veteran').trainingHistory).toBe('veteran');
         expect(decodeForm('wk=40').weeklyKm).toBe('40');
+    });
+    it('round-trips the weekly distance in both units, and the link holds inputs only', () => {
+        for (const units of ['metric', 'imperial'] as const) {
+            for (const history of ['', 'new', 'some', 'veteran'] as const) {
+                const f = { ...emptyForm, units, gender: 'female' as const, height: '170', weight: '64', paceMin: '5', paceSec: '0', weeklyKm: '31.1', trainingHistory: history };
+                expect(decodeForm(encodeForm(f))).toEqual(f);
+            }
+        }
+        const link = encodeForm({ ...emptyForm, units: 'imperial', gender: 'male', height: '70', weight: '170', paceMin: '8', paceSec: '0', weeklyKm: '25', trainingHistory: 'some', targetDate: '2026-09-01' });
+        expect(link).toContain('wk=25');
+        // Results are never stored in the link: only the keys of the form.
+        expect([...new URLSearchParams(link).keys()].sort()).toEqual(['g', 'h', 'pm', 'ps', 'td', 'th', 'u', 'w', 'wk']);
+        expect(link).not.toMatch(/reduced|withheld|estimate|gain|saving/i);
+    });
+    it('lets an out-of-range distance through so the card can flag it, and drops what is not a distance', () => {
+        expect(decodeForm('wk=9999').weeklyKm).toBe('9999'); // becomes an input error in the card, never a guess
+        expect(buildTraining({ ...emptyForm, weeklyKm: '9999' }).weeklyKmError).toBe('training.err.weeklyKm.metric');
+        for (const bad of ['99999', '-5', '<script>', '1e2', '0x10', 'NaN', '4 0', '1,5', '12.345']) expect(decodeForm(`wk=${encodeURIComponent(bad)}`).weeklyKm, bad).toBe('');
+        for (const bad of ['NEW', 'Some', 'hacker', '', ' veteran', 'veteran ']) expect(decodeForm(`th=${encodeURIComponent(bad)}`).trainingHistory, JSON.stringify(bad)).toBe('');
+    });
+    it('every distance the form accepts survives a round trip', () => {
+        for (const units of ['metric', 'imperial'] as const) {
+            for (const wk of ['0', '5', '40', '42.5', '99.99', '100', '155.3', '249', '250', '.5', '0.25']) {
+                const f = { ...emptyForm, units, weeklyKm: wk };
+                if (buildTraining(f).weeklyKmError) continue;
+                expect(decodeForm(encodeForm(f)).weeklyKm, `${units} ${wk}`).toBe(wk);
+            }
+        }
     });
     it('rejects a malformed date', () => {
         expect(decodeForm('td=2026-9-1&h=180').targetDate).toBe('');
