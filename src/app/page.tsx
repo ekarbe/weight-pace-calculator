@@ -121,7 +121,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[22rem_1fr] lg:items-start print:block">
-          <div className="rounded-3xl border bg-card glassmorphism p-5 sm:p-6 lg:sticky lg:top-24 print:hidden">
+          <div className="rounded-3xl border bg-card glassmorphism p-5 sm:p-6 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto print:hidden">
             <InputPanel form={form} adv={adv} errors={built.errors} copied={copied} onChange={change} onUnits={switchUnits} onAdv={(p) => setAdv((a) => ({ ...a, ...p }))} onShare={share} />
           </div>
 
