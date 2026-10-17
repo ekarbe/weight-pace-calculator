@@ -216,6 +216,8 @@ export interface BuildShareOptions {
     enteredWeight: string;
     url: string;
     i18n: ShareI18n;
+    /** True while the Training context card shows no estimate for this scenario: the picture would contradict it. */
+    trainingBlocked?: boolean;
 }
 
 export interface ShareBuild {
@@ -226,7 +228,7 @@ export interface ShareBuild {
 
 /** Turns the selected result into the picture's texts, or null when no image may be made. */
 export function buildShareContent(o: BuildShareOptions): ShareBuild | null {
-    if (shareBlockReason(o.sel)) return null;
+    if (shareBlockReason(o.sel) || o.trainingBlocked) return null;
     const { t, num, speak, locale } = o.i18n;
 
     const entries: { chip: string; label: string; srLabel: string; nowSec: number; targetSec: number; custom: boolean }[] = [];

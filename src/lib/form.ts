@@ -111,6 +111,9 @@ export interface TrainingFields {
     history: TrainingHistory | null;
 }
 
+/** Up to 3 integer digits and an optional fraction of 1 or 2 digits: no exponent, sign, hex, trailing dot or thousands separator. */
+const WEEKLY_KM_PATTERN = /^\d{0,3}(\.\d{1,2})?$/;
+
 /**
  * The optional training fields. Kept apart from `buildInput` on purpose: a typo here must not blank the main results.
  * A blank distance is simply unknown; an invalid one is an error (the card then withholds its figure instead of guessing).
@@ -119,8 +122,11 @@ export function buildTraining(form: FormState): TrainingFields {
     const metric = form.units === 'metric';
     const history = TRAINING_HISTORIES.find((h) => h === form.trainingHistory) ?? null;
     if (blank(form.weeklyKm)) return { weeklyKm: null, weeklyKmError: null, history };
-    const v = Number(form.weeklyKm.trim());
-    const km = metric ? v : v * KM_PER_MILE;
-    if (Number.isFinite(km) && km >= -1e-9 && km <= TRAINING.WEEKLY_KM_MAX + 1e-9) return { weeklyKm: Math.max(0, km), weeklyKmError: null, history };
+    const text = form.weeklyKm.trim();
+    if (WEEKLY_KM_PATTERN.test(text)) {
+        const v = Number(text);
+        const km = metric ? v : v * KM_PER_MILE;
+        if (km <= TRAINING.WEEKLY_KM_MAX + 1e-9) return { weeklyKm: km, weeklyKmError: null, history };
+    }
     return { weeklyKm: null, weeklyKmError: metric ? 'training.err.weeklyKm.metric' : 'training.err.weeklyKm.imperial', history };
 }

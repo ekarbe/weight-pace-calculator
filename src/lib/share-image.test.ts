@@ -161,6 +161,19 @@ describe('shareBlockReason', () => {
     });
 });
 
+describe('buildShareContent and the training card', () => {
+    it('makes no image while the training card withholds its estimate', () => {
+        expect(buildShareContent(options({ trainingBlocked: true }))).toBeNull();
+        expect(buildShareContent(options({ trainingBlocked: true, customKm: 15, includeWeights: true }))).toBeNull();
+    });
+    it('behaves exactly as before when the flag is false or omitted', () => {
+        const plain = buildShareContent(options())!;
+        expect(plain).not.toBeNull();
+        expect(buildShareContent(options({ trainingBlocked: false }))).toEqual(plain);
+        expect(buildShareContent(options({ trainingBlocked: undefined }))).toEqual(plain);
+    });
+});
+
 describe('buildShareContent', () => {
     it('shows the selected times and the time saved versus now', () => {
         const o = options();

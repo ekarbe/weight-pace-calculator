@@ -53,16 +53,26 @@ describe('buildTraining', () => {
         expect(km('250').weeklyKmError).toBeNull();
     });
     it('rejects anything else with the metric message, and returns no distance', () => {
-        for (const bad of ['250.1', '251', '-1', '-0.5', 'abc', '1e3', '30abc', 'Infinity', '--5']) {
+        for (const bad of ['250.1', '251', '-1', '-0.5', 'abc', '1e3', '1e2', '30abc', 'Infinity', '--5', '40.', '1,5', 'NaN', '0x10', '1234', '4 0', '+5', '.', '1.234']) {
             expect(km(bad), bad).toEqual({ weeklyKm: null, weeklyKmError: 'training.err.weeklyKm.metric', history: null });
         }
     });
-    it('converts miles to km and limits to 155 mi', () => {
+    it('accepts a leading or trailing space, a bare fraction and two decimals', () => {
+        expect(km(' 40 ').weeklyKm).toBe(40);
+        expect(km('.5').weeklyKm).toBe(0.5);
+        expect(km('12.34').weeklyKm).toBeCloseTo(12.34, 9);
+        expect(km('0.0').weeklyKm).toBe(0);
+        expect(km('999').weeklyKmError).toBe('training.err.weeklyKm.metric'); // three digits, over the maximum
+    });
+    it('converts miles to km and limits to 155.3 mi', () => {
         expect(km('30', { units: 'imperial' }).weeklyKm).toBeCloseTo(48.28, 2);
         expect(km('155', { units: 'imperial' }).weeklyKm).toBeCloseTo(249.45, 2);
-        expect(km('155', { units: 'imperial' }).weeklyKmError).toBeNull();
+        expect(km('155.3', { units: 'imperial' }).weeklyKm).toBeCloseTo(249.93, 2); // still within 250 km
+        expect(km('155.3', { units: 'imperial' }).weeklyKmError).toBeNull();
+        expect(km('155.4', { units: 'imperial' })).toMatchObject({ weeklyKm: null, weeklyKmError: 'training.err.weeklyKm.imperial' }); // 250.09 km
         expect(km('156', { units: 'imperial' })).toMatchObject({ weeklyKm: null, weeklyKmError: 'training.err.weeklyKm.imperial' });
         expect(km('-1', { units: 'imperial' }).weeklyKmError).toBe('training.err.weeklyKm.imperial');
+        expect(km('1e2', { units: 'imperial' }).weeklyKmError).toBe('training.err.weeklyKm.imperial');
     });
     it('whitelists the running history', () => {
         for (const h of ['new', 'some', 'veteran'] as const) expect(buildTraining({ ...ok, trainingHistory: h }).history).toBe(h);
