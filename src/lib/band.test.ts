@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     BAND_DEFAULT_FACTOR,
     BAND_HIGH_FACTOR,
+    BAND_LINEAR_LIMIT_KG,
     BAND_LOW_FACTOR,
     bandFactors,
     bandValue,
@@ -50,6 +51,9 @@ describe('constants', () => {
     });
     it('keep the default in step with the model default', () => {
         expect(BAND_DEFAULT_FACTOR).toBe(DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM);
+    });
+    it('name roughly 10 kg as where a constant gain per kg stops being a good approximation', () => {
+        expect(BAND_LINEAR_LIMIT_KG).toBe(10);
     });
 });
 
