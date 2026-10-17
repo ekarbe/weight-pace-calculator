@@ -110,6 +110,16 @@
   summary {
     break-after: avoid;
   }
+  /* Notes and short tables stay in one piece. A long table starts on a fresh page (a heading with a lone header
+     row at the foot of a page looks broken, and browsers cannot be told to keep rows with it), then runs over
+     as many pages as it needs, repeating its header. */
+  details {
+    break-inside: avoid;
+  }
+  details:has([data-slot="table-body"] > tr:nth-child(n + 41)) {
+    break-inside: auto;
+    break-before: page;
+  }
 
   /* Four race cards in a row, the custom distance full width below them; big numbers a notch smaller. */
   ul.grid.grid-cols-2 {
