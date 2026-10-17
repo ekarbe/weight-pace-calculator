@@ -139,7 +139,7 @@ export default function HomePage() {
               <>
                 <PrintInputs form={form} adv={adv} startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} />
                 <RaceCards rows={rows} index={index} onIndex={setSliderIndex} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} band={band} trainingPointer={trainingResult?.pointer} />
-                <ShareImageCard rows={rows} index={index} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} trainingBlocked={trainingResult?.blocksOutputs} />
+                <ShareImageCard rows={rows} index={index} units={form.units} enteredWeight={form.weight} customKm={built.customDistanceKm} customLabel={customLabel} trainingBlocked={trainingResult?.blocksOutputs} trainingReduced={trainingResult?.reduced} />
                 <PaceChart rows={rows} index={index} onIndex={setSliderIndex} units={form.units} customKm={built.customDistanceKm} customLabel={customLabel} band={band} />
                 <PlanCard startKg={rows[0].targetWeightKg} targetKg={rows[index].targetWeightKg} units={form.units} targetDate={form.targetDate} onDate={(d) => setForm((f) => ({ ...f, targetDate: d }))} />
                 {built.input && trainingResult && <TrainingCard result={trainingResult} input={built.input} units={form.units} weeklyKmText={form.weeklyKm} history={form.trainingHistory} fields={training} onChange={(p) => setForm((f) => ({ ...f, ...p }))} />}

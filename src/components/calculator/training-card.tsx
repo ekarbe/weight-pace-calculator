@@ -46,7 +46,10 @@ export function TrainingCard({ result, input, units, weeklyKmText, history, fiel
   const labels = unitLabels(units);
   const metric = units === 'metric';
 
-  if (result.display === 'hidden') return null;
+  // One tree for every state (the card is only hidden with the `hidden` attribute), so the status paragraph below is
+  // the same DOM node throughout: a live region has to exist before its text changes to be announced reliably.
+  const none = result.display === 'hidden';
+  const idle = result.display === 'idle';
 
   const heading = (
     <h2 id={ID.heading} tabIndex={-1} className="flex items-center gap-2 text-sm! font-bold uppercase tracking-widest text-muted-foreground">
@@ -55,17 +58,8 @@ export function TrainingCard({ result, input, units, weeklyKmText, history, fiel
   );
   const shell = 'scroll-mt-20 rounded-3xl border bg-card glassmorphism p-5 sm:p-6 break-words hyphens-auto';
 
-  if (result.display === 'idle') {
-    return (
-      <section id={ID.section} aria-labelledby={ID.heading} className={shell}>
-        {heading}
-        <p className="mt-2 text-sm">{t(result.idleKind === 'tiny' ? 'training.idle.tiny' : 'training.idle.none')}</p>
-      </section>
-    );
-  }
-
   const { withheld, rate, savings10k } = result;
-  const variant = withheld ? 'withheld' : result.reduced ? 'reduced' : 'same';
+  const variant: keyof typeof STATE = withheld ? 'withheld' : result.reduced ? 'reduced' : 'same';
   const { Icon, cls } = STATE[variant];
   const summaryKind = chooseSummary(result);
   const showIntro = result.display === 'full' || withheld === 'inputError';
@@ -115,102 +109,116 @@ export function TrainingCard({ result, input, units, weeklyKmText, history, fiel
     [t('training.how.limits'), 'limits'],
   ];
 
+  /** The state line is shown for every display but the two without figures or refusal (hidden, idle). */
+  const live = none || idle ? null : { Icon, cls, variant };
+
   return (
-    <section id={ID.section} aria-labelledby={ID.heading} className={shell}>
+    <section id={ID.section} aria-labelledby={ID.heading} hidden={none} className={shell}>
       {heading}
+      {idle && <p className="mt-2 text-sm">{t(result.idleKind === 'tiny' ? 'training.idle.tiny' : 'training.idle.none')}</p>}
       {showIntro && <p className="mt-2 text-sm">{t('training.intro')}</p>}
 
-      {/* The only live region: its text depends on the state alone, never on slider-driven numbers. */}
-      <p role="status" aria-live="polite" aria-atomic="true" className={cn('mt-3 flex items-center gap-2 text-sm font-semibold', cls)}>
-        <Icon className="h-4 w-4 shrink-0" aria-hidden /> {t(`training.state.${variant}`)}
+      {/* The only live region: always in the page, empty when there is nothing to say; its text depends on the state alone, never on slider-driven numbers. */}
+      <p role="status" aria-live="polite" aria-atomic="true" className={live ? cn('mt-3 flex items-center gap-2 text-sm font-semibold', live.cls) : 'sr-only'}>
+        {live && (
+          <>
+            <live.Icon className="h-4 w-4 shrink-0" aria-hidden /> {t(`training.state.${live.variant}`)}
+          </>
+        )}
       </p>
 
-      {withheldKey ? (
-        <p className="mt-2 text-sm">{t(withheldKey)}</p>
-      ) : (
+      {live && (
         <>
-          <p aria-hidden="true" className="mt-2 text-base">{summary((s) => formatDelta(s))}</p>
-          <p className="sr-only">{summary(speak)}</p>
-          {result.reasons.map((r) => (
-            <p key={r} className="mt-2 text-sm">{t(`training.reduced.${r}`, { max: figures.ceiling })}</p>
-          ))}
+          {withheldKey ? (
+            <p className="mt-2 text-sm">{t(withheldKey)}</p>
+          ) : (
+            <>
+              <p aria-hidden="true" className="mt-2 text-base">{summary((s) => formatDelta(s))}</p>
+              <p className="sr-only">{summary(speak)}</p>
+              {result.reasons.map((r) => (
+                <p key={r} className="mt-2 text-sm">{t(`training.reduced.${r}`, { max: figures.ceiling })}</p>
+              ))}
+            </>
+          )}
+
+          {showStatus && statusParams && (
+            <p className="mt-2 text-xs text-muted-foreground">{rich(result.load === 'unknown' ? 'training.status.unknown' : 'training.status.known', statusParams)}</p>
+          )}
+
+          {result.notes.length > 0 && (
+            <ul className="mt-2 space-y-2">
+              {result.notes.map((n) => (
+                <li key={n} className="text-xs text-muted-foreground">{t(`training.note.${n}`, { pct: figures.sust })}</li>
+              ))}
+            </ul>
+          )}
+
+          {result.display === 'full' && (
+            <>
+              <p className="mt-2 text-sm">{t(`training.context.${fields.history ?? 'unknown'}`)}</p>
+              <p className="mt-2 text-xs">{t('training.keep')}</p>
+            </>
+          )}
+
+          {result.showHelp && <p className="mt-2 text-sm">{t('training.help')}</p>}
+          {result.showSigns && <p className="mt-2 text-sm">{t('training.signs')}</p>}
+
+          {showInputs && (
+            <fieldset className="mt-4 min-w-0 print:hidden">
+              <legend className="text-sm font-semibold">{t('training.inputs.legend')}</legend>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor={ID.km} className="mb-1 leading-snug">
+                    {t('training.weeklyKm.label', { unit })} <span className="text-xs text-muted-foreground">{t('optional')}</span>
+                  </Label>
+                  <Input
+                    id={ID.km}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max={metric ? TRAINING.WEEKLY_KM_MAX : 155}
+                    step="1"
+                    placeholder={metric ? '40' : '25'}
+                    value={weeklyKmText}
+                    onChange={(e) => onChange({ weeklyKm: e.target.value })}
+                    aria-invalid={!!error}
+                    aria-describedby={error ? `${ID.hint} ${ID.err}` : ID.hint}
+                    className={cn('pointer-coarse:h-11 pointer-coarse:text-base', error && 'border-destructive')}
+                  />
+                  <p id={ID.hint} className="mt-1 text-xs text-muted-foreground">{t('training.weeklyKm.hint')}</p>
+                  {error && <p id={ID.err} role="alert" className="mt-1 text-xs text-destructive-ink">{t(error)}</p>}
+                </div>
+                <div>
+                  <Label htmlFor={ID.history} className="mb-1 leading-snug">{t('training.history.label')}</Label>
+                  <Select value={history} onValueChange={(v) => onChange({ trainingHistory: v === 'none' ? '' : (v as TrainingHistory) })}>
+                    <SelectTrigger
+                      id={ID.history}
+                      className="w-full text-left whitespace-normal data-[size=default]:h-auto data-[size=default]:min-h-9 pointer-coarse:data-[size=default]:min-h-11 pointer-coarse:text-base *:data-[slot=select-value]:line-clamp-none"
+                    >
+                      <SelectValue placeholder={t('training.history.placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{t('training.history.none')}</SelectItem>
+                      {HISTORY_ITEMS.map((h) => <SelectItem key={h} value={h}>{t(`training.history.${h}`)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </fieldset>
+          )}
+
+          <details className="mt-4 print:hidden">
+            <summary className="cursor-pointer text-sm font-medium">{t('training.how.summary')}</summary>
+            <div className="mt-2 space-y-2">
+              {how.map(([text, key]) => <p key={key} className="text-xs">{text}</p>)}
+            </div>
+          </details>
+
+          {/* Outside the closed details on purpose: it is what a reader of the card (or of its printout) has to see. */}
+          <p className="mt-4 text-xs">{t('training.caveat')}</p>
+          <p className="mt-2 text-xs">{t('training.scope')}</p>
         </>
       )}
-
-      {showStatus && statusParams && (
-        <p className="mt-2 text-xs text-muted-foreground">{rich(result.load === 'unknown' ? 'training.status.unknown' : 'training.status.known', statusParams)}</p>
-      )}
-
-      {result.notes.length > 0 && (
-        <ul className="mt-2 space-y-2">
-          {result.notes.map((n) => (
-            <li key={n} className="text-xs text-muted-foreground">{t(`training.note.${n}`, { pct: figures.sust })}</li>
-          ))}
-        </ul>
-      )}
-
-      {result.display === 'full' && (
-        <>
-          <p className="mt-2 text-sm">{t(`training.context.${fields.history ?? 'unknown'}`)}</p>
-          <p className="mt-2 text-xs">{t('training.keep')}</p>
-        </>
-      )}
-
-      {result.showHelp && <p className="mt-2 text-sm">{t('training.help')}</p>}
-      {result.showSigns && <p className="mt-2 text-sm">{t('training.signs')}</p>}
-
-      {showInputs && (
-        <fieldset className="mt-4 min-w-0 print:hidden">
-          <legend className="text-sm font-semibold">{t('training.inputs.legend')}</legend>
-          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor={ID.km} className="mb-1 leading-snug">
-                {t('training.weeklyKm.label', { unit })} <span className="text-xs text-muted-foreground">{t('optional')}</span>
-              </Label>
-              <Input
-                id={ID.km}
-                type="number"
-                inputMode="decimal"
-                min="0"
-                max={metric ? TRAINING.WEEKLY_KM_MAX : 155}
-                step="1"
-                placeholder={metric ? '40' : '25'}
-                value={weeklyKmText}
-                onChange={(e) => onChange({ weeklyKm: e.target.value })}
-                aria-invalid={!!error}
-                aria-describedby={error ? `${ID.hint} ${ID.err}` : ID.hint}
-                className={cn('pointer-coarse:h-11 pointer-coarse:text-base', error && 'border-destructive')}
-              />
-              <p id={ID.hint} className="mt-1 text-xs text-muted-foreground">{t('training.weeklyKm.hint')}</p>
-              {error && <p id={ID.err} role="alert" className="mt-1 text-xs text-red-700 dark:text-destructive">{t(error)}</p>}
-            </div>
-            <div>
-              <Label htmlFor={ID.history} className="mb-1 leading-snug">{t('training.history.label')}</Label>
-              <Select value={history} onValueChange={(v) => onChange({ trainingHistory: v === 'none' ? '' : (v as TrainingHistory) })}>
-                <SelectTrigger
-                  id={ID.history}
-                  className="w-full text-left whitespace-normal data-[size=default]:h-auto data-[size=default]:min-h-9 pointer-coarse:data-[size=default]:min-h-11 pointer-coarse:text-base *:data-[slot=select-value]:line-clamp-none"
-                >
-                  <SelectValue placeholder={t('training.history.placeholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t('training.history.none')}</SelectItem>
-                  {HISTORY_ITEMS.map((h) => <SelectItem key={h} value={h}>{t(`training.history.${h}`)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </fieldset>
-      )}
-
-      <details className="mt-4 print:hidden">
-        <summary className="cursor-pointer text-sm font-medium">{t('training.how.summary')}</summary>
-        <div className="mt-2 space-y-2">
-          {how.map(([text, key]) => <p key={key} className="text-xs">{text}</p>)}
-        </div>
-      </details>
-
-      <p className="mt-4 text-xs">{t('training.scope')}</p>
     </section>
   );
 }

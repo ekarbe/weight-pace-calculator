@@ -33,7 +33,7 @@ const RACES = [
 
 const STRIPE = 'bg-[repeating-linear-gradient(90deg,var(--foreground)_0_8px,transparent_8px_16px)]';
 
-function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel, range }: { chip: string; chipClass: string; sub: string; timeSec: number; time: string; saved: number; srLabel: string; range: { low: number; high: number } | null }) {
+function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel, range, muted }: { chip: string; chipClass: string; sub: string; timeSec: number; time: string; saved: number; srLabel: string; range: { low: number; high: number } | null; muted: boolean }) {
   const { t, speak } = useI18n();
   const showRange = range !== null && saved > 0.5 && formatDelta(range.low) !== formatDelta(range.high);
   return (
@@ -45,8 +45,9 @@ function RaceFace({ chip, chipClass, sub, timeSec, time, saved, srLabel, range }
       <div aria-hidden>
         <span className={cn('inline-block rounded-md px-2 py-0.5 text-lg font-black tracking-tight', chipClass)}>{chip}</span>
         <span className="mt-1 block text-[10px] uppercase tracking-wider text-muted-foreground">{sub}</span>
-        <p className="mt-2 text-3xl sm:text-4xl font-black tabular-nums tracking-tight text-foreground">{time}</p>
-        <p className={cn('mt-1 text-sm font-semibold tabular-nums', saved > 0.5 ? 'text-primary-ink' : 'text-muted-foreground')}>
+        {/* Sized from the card: an 8-character time is about 4.2 em wide, so 22 % of the card keeps even 03:47:26 inside it at any width. */}
+        <p className="mt-2 text-[clamp(1.125rem,22cqw,2.25rem)] font-black tabular-nums tracking-tight text-foreground">{time}</p>
+        <p className={cn('mt-1 text-sm font-semibold tabular-nums', saved > 0.5 && !muted ? 'text-primary-ink' : 'text-muted-foreground')}>
           {saved > 0.5 ? `−${formatDelta(saved)}` : t('race.baseline')}
           {showRange && <span className="block text-xs font-normal text-muted-foreground">{t('band.card.range', { low: formatDelta(range.low), high: formatDelta(range.high) })}</span>}
         </p>
@@ -70,8 +71,11 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
   const paceText = pace === null ? '–' : formatPace(units === 'metric' ? pace : secPerKmToSecPerMile(pace));
   const tenKSaved = (base.estimated10kTimeSec ?? 0) - (sel.estimated10kTimeSec ?? 0);
   const edges = band?.rows[index];
+  // Where the Training context card says the estimate should not be relied on, the cards stop dressing it up: the
+  // saving loses its green and the range goes (the range assumes the healthy case and its low end reads as a floor).
+  const muted = trainingPointer === 'withheld';
   const rangeOf = (baseSec: number, metric: BandMetric) =>
-    edges ? timeSavedRange(baseSec, bandValue(edges.conservative, metric, customKm), bandValue(edges.optimistic, metric, customKm)) : null;
+    edges && !muted ? timeSavedRange(baseSec, bandValue(edges.conservative, metric, customKm), bandValue(edges.optimistic, metric, customKm)) : null;
   const sliderText =
     index === 0
       ? t('target.sliderNow', { weight: disp(sel.targetWeightKg, index), unit: labels.weight })
@@ -107,27 +111,30 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
           <span>{disp(rows[rows.length - 1].targetWeightKg, rows.length - 1)} {labels.weight}</span>
         </div>
 
-        {(sel.isPotentiallyUnhealthyFat || sel.paceLimited) && (
-          <div role="status" className="mt-4 flex gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-            <span>
-              {sel.isPotentiallyUnhealthyFat && `${t('alert.unhealthyFat')} `}
-              {sel.paceLimited && t('alert.paceCapped')}
-            </span>
-          </div>
-        )}
+        {/* The live region is always in the page and the box comes and goes inside it, so the warning is announced when it appears. */}
+        <div role="status">
+          {(sel.isPotentiallyUnhealthyFat || sel.paceLimited) && (
+            <div className="mt-4 flex gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive-ink">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
+              <span>
+                {sel.isPotentiallyUnhealthyFat && `${t('alert.unhealthyFat')} `}
+                {sel.paceLimited && t('alert.paceCapped')}
+              </span>
+            </div>
+          )}
+        </div>
 
         {trainingPointer !== 'none' && <TrainingPointerLine kind={trainingPointer} />}
       </div>
 
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {RACES.map((race) => (
-          <li key={race.key} className="relative overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4">
-            <RaceFace chip={race.key} chipClass="bg-foreground text-background" sub={t(race.long)} timeSec={race.time(sel) ?? 0} time={race.text(sel)} saved={(race.time(base) ?? 0) - (race.time(sel) ?? 0)} srLabel={t(race.long)} range={rangeOf(race.time(base) ?? 0, race.key)} />
+          <li key={race.key} className="@container relative overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4">
+            <RaceFace chip={race.key} chipClass="bg-foreground text-background" sub={t(race.long)} timeSec={race.time(sel) ?? 0} time={race.text(sel)} saved={(race.time(base) ?? 0) - (race.time(sel) ?? 0)} srLabel={t(race.long)} range={rangeOf(race.time(base) ?? 0, race.key)} muted={muted} />
           </li>
         ))}
         {customKm !== null && (
-          <li className="relative col-span-2 overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4 lg:col-span-4">
+          <li className="@container relative col-span-2 overflow-hidden rounded-2xl border-2 border-foreground/80 bg-card glassmorphism p-4 lg:col-span-4">
             <RaceFace
               chip={customLabel}
               chipClass="bg-primary text-primary-foreground"
@@ -137,6 +144,7 @@ export function RaceCards({ rows, index, onIndex, units, enteredWeight, customKm
               saved={estimateRaceTimeSec(base.estimatedThresholdPaceSec ?? 0, customKm) - estimateRaceTimeSec(sel.estimatedThresholdPaceSec ?? 0, customKm)}
               srLabel={customLabel}
               range={rangeOf(estimateRaceTimeSec(base.estimatedThresholdPaceSec ?? 0, customKm), 'custom')}
+              muted={muted}
             />
           </li>
         )}
