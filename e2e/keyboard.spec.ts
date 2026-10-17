@@ -55,7 +55,6 @@ function describeFocus(page: Page): Promise<Stop | null> {
   });
 }
 
-/** The global 2px outline, or a box-shadow ring of at least 2px (the shadcn controls draw a 3px ring instead). */
 /**
  * Presses Tab until the last control has been reached and returns every stop. A native date field has several
  * internal Tab stops (month, day, year, picker), so one control can legitimately be visited more than once in a row.
@@ -77,6 +76,7 @@ const firstStops = (stops: Stop[]) => stops.filter((s, i) => i === 0 || stops[i 
 
 const collapse = (stops: Stop[]) => stops.map((s) => s.index).filter((v, i, all) => v !== all[i - 1]);
 
+/** The global 2px outline, or a box-shadow ring of at least 2px (the shadcn controls draw a 3px ring instead). */
 const hasFocusIndicator = (s: Stop) => {
   const outlineWidth = parseFloat(s.outline.split(' ')[1] ?? '0');
   const spreads = s.ring.split(/,(?![^(]*\))/).map((shadow) => parseFloat(shadow.match(/-?\d+(?:\.\d+)?px/g)?.[3] ?? '0'));

@@ -70,10 +70,10 @@ test.describe('share image', () => {
     const lines = await drawn(page);
     const text = lines.join('\n');
 
-    for (const expected of ['ESTIMATED RACE TIMES', 'Estimated race times', '23:17', '48:01', '01:47:31', '03:47:26', '01:14:26', '15 km']) {
-      if (expected === 'ESTIMATED RACE TIMES' || expected === 'Estimated race times') continue;
+    for (const expected of ['23:17', '48:01', '01:47:31', '03:47:26', '01:14:26', '15 km']) {
       expect(text, `painted text should contain ${expected}`).toContain(expected);
     }
+    // The title is painted in capitals (upper-cased for the locale), so compare case-insensitively.
     expect(text.toLowerCase()).toContain('estimated race times');
     expect(text).toContain('Estimates, not a weight-loss plan.');
     const address = lines.find((l) => l.startsWith('http'));
