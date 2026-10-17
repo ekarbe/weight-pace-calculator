@@ -49,7 +49,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.querySelector('meta[name="description"]')?.setAttribute('content', MESSAGES[locale]['meta.description']);
   }, [locale]);
 
   const setLocale = useCallback((l: Locale) => {
@@ -87,6 +86,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={value}>
       {/* React 19 hoists this into <head>; setting document.title directly gets overwritten. */}
       <title>{MESSAGES[locale]['meta.title']}</title>
+      {/* Rendered rather than patched into the DOM: React owns the hoisted element, and a patched copy left a second, English one behind. */}
+      <meta name="description" content={MESSAGES[locale]['meta.description']} />
       {children}
     </Ctx.Provider>
   );

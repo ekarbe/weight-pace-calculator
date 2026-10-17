@@ -7,9 +7,11 @@ const ESSENTIAL_FAT_MALE_WARN_THRESHOLD = 5;
 const ESSENTIAL_FAT_FEMALE_WARN_THRESHOLD = 13;
 const MIN_PACE_SEC_MALE = 2 * 60 + 40;
 const MIN_PACE_SEC_FEMALE = 3 * 60 + 0;
+/** Fastest threshold pace (s/km) the model returns for a sex; faster estimates are capped here. */
+export const minPaceSecFor = (gender: UserInput['gender']): number => (gender === 'male' ? MIN_PACE_SEC_MALE : MIN_PACE_SEC_FEMALE);
 
 
-const RACE_DISTANCES = {
+export const RACE_DISTANCES = {
     '5k': 5,
     '10k': 10,
     'hm': 21.0975,
@@ -98,6 +100,17 @@ export function estimateRaceTimeSec(thresholdPaceSecPerKm: number, distanceKm: n
     return Math.max(1, thresholdPaceSecPerKm) * racePaceFactor(distanceKm) * distanceKm;
 }
 
+/**
+ * Inverse of `estimateRaceTimeSec`: the threshold pace (s/km) implied by a race result.
+ * Throws a RangeError for a non-positive or non-finite time or distance.
+ */
+export function thresholdPaceFromRace(timeSec: number, distanceKm: number): number {
+    if (!Number.isFinite(timeSec) || !Number.isFinite(distanceKm) || timeSec <= 0 || distanceKm <= 0) {
+        throw new RangeError('Race time and distance must be positive numbers.');
+    }
+    return timeSec / distanceKm / racePaceFactor(distanceKm);
+}
+
 function estimateRacePaceFromThreshold(thresholdPaceSecPerKm: number): { [key: string]: number } {
     const safeThresholdPace = Math.max(1, thresholdPaceSecPerKm);
     return {
@@ -170,8 +183,12 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
 
     const WEIGHT_STEP_KG = 0.5;
     const stepCount = Math.max(0, Math.ceil((startWeight - endWeight) / WEIGHT_STEP_KG - 1e-9));
+    // The table never goes below the entered weight's own row. A runner already at or under the floor gets the one
+    // row for the weight they entered (no change, so the entered pace and its race times come back unchanged), not a
+    // heavier floor row whose "weight lost" would be negative and whose pace would be slower than the one they typed.
+    const lowestWeight = Math.min(endWeight, startWeight);
     for (let step = 0; step <= stepCount; step++) {
-        const targetWeight = Math.max(startWeight - step * WEIGHT_STEP_KG, endWeight);
+        const targetWeight = Math.max(startWeight - step * WEIGHT_STEP_KG, lowestWeight);
         if (lbmKg !== null && targetWeight <= lbmKg) {
             zeroFatWarningHit = true;
             break;
@@ -232,7 +249,7 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
             paceLimited: paceLimited,
         });
 
-        if (targetWeight <= endWeight) break;
+        if (targetWeight <= lowestWeight) break;
     }
 
     if (unhealthyFatWarningNeeded) {

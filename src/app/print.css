@@ -1,0 +1,225 @@
+/*
+ * Print stylesheet (imported by globals.css). Goal: a clean 1-3 page, black-on-white document with the
+ * race cards, chart, timeline, the full table and every note, and none of the interactive chrome.
+ *
+ * These rules are not in a cascade layer, so they beat Tailwind utilities. Where a rule has to beat an
+ * equally specific one in globals.css (which is loaded after this file) the selector is prefixed with `html`.
+ * Elements that exist only on paper use `hidden print:block` in their component.
+ */
+
+/* One margin set that suits both A4 and Letter; the paper size stays the user's choice. */
+@page {
+  margin: 10mm 12mm 11mm;
+}
+
+@media print {
+  /* ---- Always the light theme, even if the page is in dark mode ---- */
+  html:root,
+  html.dark {
+    /* next-themes sets color-scheme inline, hence !important. */
+    color-scheme: light !important;
+    --background: #ffffff;
+    --foreground: #111114;
+    --card: #ffffff;
+    --card-foreground: #111114;
+    --popover: #ffffff;
+    --popover-foreground: #111114;
+    --primary: #34c759;
+    --primary-foreground: #08230f;
+    --primary-ink: #0f6a2e;
+    --secondary: #eeeef0;
+    --secondary-foreground: #111114;
+    --muted: #eeeef0;
+    --muted-foreground: #4a4a50;
+    --accent: #eeeef0;
+    --accent-foreground: #111114;
+    --destructive: #b3261e;
+    --destructive-ink: #b3261e;
+    --border: #c9c9ce;
+    --input: #c9c9ce;
+    --control-border: #c9c9ce;
+    --ring: #117a35;
+    --chart-1: #34c759;
+    --chart-2: #30b0c7;
+    --chart-3: #007aff;
+    --chart-4: #5856d6;
+    --chart-5: #ff9500;
+  }
+
+  /* A little denser than the screen: the base size and all spacing derive from these two. */
+  html:root {
+    font-size: 14px;
+    --spacing: 0.2rem;
+  }
+
+  /* Backgrounds (chips, selected row, risk colours) and SVG colours must survive "Background graphics: off". */
+  *,
+  *::before,
+  *::after {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  html .glassmorphism {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* ---- Page chrome that has no place on paper ---- */
+  html .mesh-background {
+    display: none;
+  }
+  /* Safety net for controls added later: nothing interactive prints. Pressed toggles stay as static labels
+     (they say which metric the chart shows). */
+  input,
+  select,
+  textarea,
+  label,
+  [role="slider"],
+  button:not([aria-pressed="true"]),
+  input[type="range"] + div {
+    display: none;
+  }
+
+  html .min-h-screen {
+    min-height: 0;
+  }
+  main {
+    padding: 0;
+  }
+  main.container {
+    max-width: none;
+  }
+  /* Tighter vertical rhythm: cards and the gaps between them. */
+  .space-y-6 > :not(:last-child) {
+    margin-block-end: 8px;
+  }
+  .rounded-3xl {
+    padding: 10px 16px;
+  }
+
+  /* ---- Pagination ---- */
+  section,
+  li,
+  tr {
+    break-inside: avoid;
+  }
+  h2,
+  summary {
+    break-after: avoid;
+  }
+  /* Notes and short tables stay in one piece. A long table starts on a fresh page (a heading with a lone header
+     row at the foot of a page looks broken, and browsers cannot be told to keep rows with it), then runs over
+     as many pages as it needs, repeating its header. */
+  details {
+    break-inside: avoid;
+  }
+  details:has([data-slot="table-body"] > tr:nth-child(n + 41)) {
+    break-inside: auto;
+    break-before: page;
+  }
+
+  /* Four race cards in a row, the custom distance full width below them; big numbers a notch smaller. */
+  ul.grid.grid-cols-2 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  ul.grid.grid-cols-2 > li.col-span-2 {
+    grid-column: 1 / -1;
+  }
+  /* The custom distance becomes one compact strip: chip, label, time, saving. */
+  ul.grid.grid-cols-2 > li.col-span-2 > div[aria-hidden="true"] {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    column-gap: 14px;
+  }
+  ul.grid.grid-cols-2 > li.col-span-2 > div[aria-hidden="true"] > * {
+    margin: 0;
+  }
+  ul.grid li p.font-black {
+    font-size: 1.75rem;
+    line-height: 1.1;
+  }
+  p.text-5xl {
+    font-size: 2.6rem;
+    line-height: 1;
+  }
+
+  /* ---- Chart ---- */
+  svg[role="img"] {
+    max-height: 190px;
+  }
+  /* The light green line is hard to see on paper, and invisible in greyscale. */
+  svg [stroke="var(--primary)"] {
+    stroke: var(--primary-ink);
+  }
+
+  /* ---- Table and notes: no disclosure widget, everything expanded, no inner scrolling ---- */
+  details > summary {
+    list-style: none;
+  }
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+  /* Where supported, show the content of a closed <details> even if the beforeprint script did not run. */
+  details::details-content {
+    content-visibility: visible;
+    display: block;
+  }
+  [role="region"] {
+    max-height: none;
+    overflow: visible;
+  }
+
+  [data-slot="table"] {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+  [data-slot="table-header"] {
+    position: static;
+    display: table-header-group; /* repeats on every page */
+  }
+  [data-slot="table-head"] {
+    height: auto;
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+  [data-slot="table-cell"] {
+    padding: 1px 4px;
+  }
+  [data-slot="table-body"] > tr {
+    border-bottom-color: #e4e4e7;
+  }
+  [data-slot="table-body"] > tr:nth-child(even) {
+    background: #f6f6f7;
+  }
+  /* Also readable without colour: bold with a marker. */
+  [data-slot="table-body"] > tr[aria-current="true"] {
+    background: #dcf3e4;
+    font-weight: 700;
+  }
+  [data-slot="table-body"] > tr[aria-current="true"] > td:first-child::before {
+    content: "▸ ";
+  }
+
+  /* Very long tables (a heavy runner with a low BMI floor): denser rows so the document stays at about 3 pages. */
+  [role="region"]:has([data-slot="table-body"] > tr:nth-child(n + 100)) [data-slot="table"] {
+    font-size: 9px;
+    line-height: 1.08;
+  }
+  [role="region"]:has([data-slot="table-body"] > tr:nth-child(n + 100)) [data-slot="table-head"] {
+    font-size: 9px;
+  }
+  [role="region"]:has([data-slot="table-body"] > tr:nth-child(n + 100)) [data-slot="table-cell"] {
+    padding-block: 0;
+  }
+
+  /* Notes: a touch smaller. */
+  details ul {
+    font-size: 12px;
+  }
+}

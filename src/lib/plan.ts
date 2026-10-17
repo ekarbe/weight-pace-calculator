@@ -10,7 +10,8 @@ export function classifyRate(pctPerWeek: number): LossRisk {
     return 'aggressive';
 }
 
-const MS_PER_WEEK = 7 * 24 * 3600 * 1000;
+/** Whole calendar days since the epoch for the local calendar date of `d` (a clock change cannot shift it). */
+const dayNumber = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
 
 /** Parse "YYYY-MM-DD" as a local calendar date (never UTC, so no off-by-one). */
 export function parseISODate(iso: string): Date | null {
@@ -35,7 +36,8 @@ export interface RatePlan {
 export function planByDate(startKg: number, lostKg: number, targetISO: string, today: Date): RatePlan | null {
     const target = parseISODate(targetISO);
     if (!target || lostKg <= 0 || startKg <= 0) return null;
-    const weeks = (target.getTime() - startOfDay(today).getTime()) / MS_PER_WEEK;
+    // Calendar days, not milliseconds: a 23 or 25 hour day around a clock change must not move a rate across a class limit.
+    const weeks = (dayNumber(target) - dayNumber(today)) / 7;
     if (weeks <= 0) return null;
     const kgPerWeek = lostKg / weeks;
     const pctPerWeek = (kgPerWeek / startKg) * 100;

@@ -1,9 +1,11 @@
 'use client';
 
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cn, formatPace, formatTime } from '@/lib/utils';
 import type { ResultRow } from '@/lib/calculations';
 import { estimateRaceTimeSec } from '@/lib/calculations';
+import { BAND_DEFAULT_FACTOR, BAND_LINEAR_LIMIT_KG, bandValue, type Band, type BandPoint } from '@/lib/band';
+import type { TrainingPointer } from '@/lib/training';
 import { kgToLb, secPerKmToSecPerMile, unitLabels, type UnitSystem } from '@/lib/units';
 import { useI18n } from '@/i18n/provider';
 
@@ -16,18 +18,41 @@ interface Props {
   units: UnitSystem;
   customKm: number | null;
   customLabel: string;
+  band: Band | null;
+  /** What the Training context card says about this scenario; where it withholds the estimate the chart draws no range. */
+  trainingPointer?: TrainingPointer;
 }
 
-const W = 640;
-const H = 260;
+/** Width the chart is laid out for before it has been measured. */
+const W_FALLBACK = 640;
 const PAD = { l: 56, r: 16, t: 16, b: 32 };
+/** One drawing unit is one CSS pixel, so the axis labels keep their size at any width (a fixed 640-unit canvas shrank them to 4 px on a phone). */
+const heightFor = (width: number) => Math.min(300, Math.max(200, Math.round(width * 0.45)));
 
-export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }: Props) {
+export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, band, trainingPointer = 'none' }: Props) {
   const { t, num, speak } = useI18n();
   const [metric, setMetric] = useState<Metric>('10K');
+  const [showRange, setShowRange] = useState(true);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(W_FALLBACK);
+  const W = width;
+  const H = heightFor(width);
   const labels = unitLabels(units);
   const tabsId = useId();
+
+  useLayoutEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = Math.round(el.getBoundingClientRect().width);
+      if (w > 0) setWidth(Math.min(Math.max(w, 240), 1200));
+    };
+    // Measured before the first paint, then followed while the window or the card changes size.
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const active: Metric = metric === 'custom' && customKm === null ? '10K' : metric;
   const options: { key: Metric; label: string }[] = [
@@ -52,21 +77,37 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
   };
   const fmt = (v: number) => (active === 'pace' ? formatPace(v) : formatTime(v));
 
+  // No range to draw, switch or announce when the band has no width anywhere (e.g. the entered weight is below the BMI floor),
+  // or where the Training context card says the estimate should not be relied on: the range assumes the healthy case,
+  // and its low end would read as a floor. The race cards leave the range out in the same scenarios.
+  const bandUsable =
+    band !== null && trainingPointer !== 'withheld' && band.rows.length === rows.length && band.rows.some((r) => r.conservative.paceSec !== r.optimistic.paceSec);
+  const bandOn = showRange && bandUsable;
+  const edge = (p: BandPoint) => {
+    const v = bandValue(p, active, customKm);
+    return active === 'pace' && units !== 'metric' ? secPerKmToSecPerMile(v) : v;
+  };
+
   const geo = useMemo(() => {
     const vals = rows.map(value);
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
+    const slow = bandOn ? band.rows.map((r) => edge(r.conservative)) : null;
+    const fast = bandOn ? band.rows.map((r) => edge(r.optimistic)) : null;
+    const min = Math.min(...vals, ...(fast ?? []));
+    const max = Math.max(...vals, ...(slow ?? []));
     const span = max - min || 1;
     const lo = min - span * 0.08;
     const hi = max + span * 0.08;
     const x = (i: number) => PAD.l + (rows.length === 1 ? 0 : (i / (rows.length - 1)) * (W - PAD.l - PAD.r));
     const y = (v: number) => PAD.t + (1 - (v - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
     const ticks = [0, 1, 2, 3].map((k) => lo + ((hi - lo) * k) / 3);
-    return { vals, x, y, ticks };
+    return { vals, slow, fast, x, y, ticks };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, active, units, customKm]);
+  }, [rows, active, units, customKm, band, bandOn, W, H]);
 
   const path = geo.vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${geo.x(i).toFixed(1)},${geo.y(v).toFixed(1)}`).join(' ');
+  const pts = (vs: number[]) => vs.map((v, i) => `${geo.x(i).toFixed(1)},${geo.y(v).toFixed(1)}`);
+  const slowPts = geo.slow ? pts(geo.slow) : [];
+  const fastPts = geo.fast ? pts(geo.fast) : [];
   const dispW = (kg: number) => num(units === 'metric' ? kg : kgToLb(kg), 0);
 
   const scrub = (clientX: number) => {
@@ -81,6 +122,7 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
   const sel = rows[index];
   const selX = geo.x(index);
   const selY = geo.y(geo.vals[index]);
+  const selTop = geo.slow ? geo.y(geo.slow[index]) : selY;
   const xTicks = [0, Math.round((rows.length - 1) / 2), rows.length - 1];
 
   return (
@@ -107,6 +149,31 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
         </div>
       </div>
 
+      {band && bandUsable && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1">
+          <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
+            <input type="checkbox" role="switch" checked={showRange} onChange={(e) => setShowRange(e.target.checked)} className="h-4 w-4 cursor-pointer accent-primary" />
+            {t('band.show')}
+          </label>
+          {bandOn && (
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <svg aria-hidden width="28" height="10" className="shrink-0"><line x1="1" x2="27" y1="5" y2="5" stroke="var(--primary-ink)" strokeWidth="3" strokeLinecap="round" /></svg>
+                {t('band.legend.estimate', { factor: band.factor })}
+              </li>
+              <li className="flex items-center gap-2">
+                <svg aria-hidden width="28" height="12" className="shrink-0">
+                  <rect x="1" y="1" width="26" height="10" fill="var(--primary)" fillOpacity="0.2" />
+                  <line x1="1" x2="27" y1="1" y2="1" stroke="var(--primary-ink)" strokeWidth="1.5" strokeDasharray="5 3" />
+                  <line x1="1" x2="27" y1="11" y2="11" stroke="var(--primary-ink)" strokeWidth="1.5" strokeDasharray="5 3" />
+                </svg>
+                {t('band.legend.range', { low: band.lowFactor, high: band.highFactor })}
+              </li>
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Pointer scrubbing is a convenience; the slider above is the keyboard/AT control. */}
       <svg
         ref={svgRef}
@@ -116,7 +183,7 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
           metric: t(active === 'pace' ? 'chart.metric.pace' : 'chart.metric.time'),
           weight: dispW(sel.targetWeightKg), unit: labels.weight, value: speak(geo.vals[index]),
           from: speak(geo.vals[0]), w1: dispW(rows[0].targetWeightKg), to: speak(geo.vals[rows.length - 1]), w2: dispW(rows[rows.length - 1].targetWeightKg),
-        })}
+        }) + (geo.slow && geo.fast ? ` ${t('band.chart.aria', { weight: dispW(sel.targetWeightKg), unit: labels.weight, fast: speak(geo.fast[index]), slow: speak(geo.slow[index]) })}` : '')}
         className="mt-4 w-full select-none"
         style={{ touchAction: 'pan-y' }}
         onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); scrub(e.clientX); }}
@@ -133,20 +200,35 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel }
             {dispW(rows[i].targetWeightKg)} {labels.weight}
           </text>
         ))}
-        <path d={path} fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+        {bandOn && (
+          <>
+            <path d={`M${[...slowPts, ...fastPts.slice().reverse()].join(' L')}Z`} fill="var(--primary)" fillOpacity="0.2" />
+            <path d={`M${slowPts.join(' L')}`} fill="none" stroke="var(--primary-ink)" strokeWidth="1.5" strokeDasharray="6 4" strokeLinejoin="round" />
+            <path d={`M${fastPts.join(' L')}`} fill="none" stroke="var(--primary-ink)" strokeWidth="1.5" strokeDasharray="6 4" strokeLinejoin="round" />
+          </>
+        )}
+        <path d={path} fill="none" stroke="var(--primary-ink)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
         <line x1={selX} x2={selX} y1={PAD.t} y2={H - PAD.b} stroke="var(--primary)" strokeOpacity="0.4" strokeDasharray="4 4" />
-        <circle cx={selX} cy={selY} r="7" fill="var(--background)" stroke="var(--primary)" strokeWidth="3" />
+        {geo.slow && geo.fast && [geo.slow[index], geo.fast[index]].map((v, k) => (
+          <circle key={k} cx={selX} cy={geo.y(v)} r="4" fill="var(--background)" stroke="var(--primary-ink)" strokeWidth="2" />
+        ))}
+        <circle cx={selX} cy={selY} r="7" fill="var(--background)" stroke="var(--primary-ink)" strokeWidth="3" />
         <text
           x={Math.min(Math.max(selX, PAD.l + 28), W - PAD.r - 28)}
-          y={Math.max(selY - 14, PAD.t + 10)}
+          y={Math.max(selTop - 14, PAD.t + 10)}
           textAnchor="middle"
           fontSize="13"
           fontWeight="700"
+          stroke="var(--background)"
+          strokeWidth="4"
+          strokeLinejoin="round"
+          paintOrder="stroke"
           className="fill-foreground tabular-nums"
         >
           {fmt(geo.vals[index])}
         </text>
       </svg>
+      {band && <p className="mt-3 text-xs">{t('band.disclaimer', { low: band.lowFactor, high: band.highFactor, default: BAND_DEFAULT_FACTOR, limit: dispW(BAND_LINEAR_LIMIT_KG), unit: labels.weight })}</p>}
     </section>
   );
 }

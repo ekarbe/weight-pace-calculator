@@ -17,7 +17,8 @@ export function ResultsTable({ rows, warnings, units, enteredWeight, selected }:
       <details className="rounded-2xl border bg-card glassmorphism p-4">
         <summary className="cursor-pointer font-semibold">{t('table.summary', { n: rows.length })}</summary>
         <div className="mt-3 max-h-[28rem] overflow-auto" role="region" aria-label={t('table.summary', { n: rows.length })} tabIndex={0}>
-          <Table>
+          {/* The wrapper above is the single, keyboard-focusable scroll container (also makes the sticky header work). */}
+          <Table containerClassName="overflow-visible">
             <TableCaption className="sr-only">{t('table.summary', { n: rows.length })}</TableCaption>
             <TableHeader className="sticky top-0 bg-card">
               <TableRow>
@@ -32,7 +33,7 @@ export function ResultsTable({ rows, warnings, units, enteredWeight, selected }:
             </TableHeader>
             <TableBody>
               {rows.map((r, i) => (
-                <TableRow key={i} aria-current={i === selected ? 'true' : undefined} className={cn('tabular-nums', i === selected && 'bg-primary/10', r.isPotentiallyUnhealthyFat && 'text-destructive')}>
+                <TableRow key={i} aria-current={i === selected ? 'true' : undefined} className={cn('tabular-nums', i === selected && 'bg-primary/10', r.isPotentiallyUnhealthyFat && 'text-destructive-ink')}>
                   <TableCell className="text-center font-medium">{w(r.targetWeightKg, i)}</TableCell>
                   <TableCell className="text-center">
                     {r.estimatedBodyFatPercentage !== null ? num(r.estimatedBodyFatPercentage, 1) : '–'}

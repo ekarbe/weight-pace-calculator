@@ -1,7 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./print.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Never in print: the printout is always light (see print.css), so dark: utilities must not apply. */
+@custom-variant dark {
+  @media not print {
+    &:is(.dark *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -23,8 +31,10 @@
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
+  --color-control: var(--control-border);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-ink: var(--destructive-ink);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -50,7 +60,8 @@
   --foreground: #1d1d1f;
   --card: rgba(255, 255, 255, 0.65);
   --card-foreground: #1d1d1f;
-  --popover: rgba(255, 255, 255, 0.65);
+  /* Opaque on purpose: a list that opens over body text must not let that text show through its options. */
+  --popover: #ffffff;
   --popover-foreground: #1d1d1f;
   --primary: #34c759;
   --primary-foreground: #08230f;
@@ -59,12 +70,17 @@
   --secondary: #e5e5ea;
   --secondary-foreground: #1d1d1f;
   --muted: #e5e5ea;
-  --muted-foreground: #6e6e73;
+  /* Dark enough for 4.5:1 also on the greenest part of the page background (the mesh tints it): 5:1 there. */
+  --muted-foreground: #5f5f64;
   --accent: #e5e5ea;
   --accent-foreground: #1d1d1f;
   --destructive: #ff3b30;
+  /* Darker red for text on light surfaces (AA contrast, about 6:1 on the card); borders and fills use --destructive. */
+  --destructive-ink: #b3261e;
   --border: rgba(0, 0, 0, 0.04);
   --input: rgba(0, 0, 0, 0.08);
+  /* The edge of a text field or select is the only thing that shows where it is, so it needs 3:1 on the card (3.4:1), unlike --border, which only separates surfaces. */
+  --control-border: #85858a;
   /* Darker than --primary so focus indicators reach 3:1 on light surfaces. */
   --ring: #117a35;
   --chart-1: #34c759;
@@ -83,7 +99,7 @@
   --foreground: #f5f5f7;
   --card: rgba(28, 28, 30, 0.65);
   --card-foreground: #f5f5f7;
-  --popover: rgba(28, 28, 30, 0.65);
+  --popover: #1c1c1e;
   --popover-foreground: #f5f5f7;
   --primary: #30d158;
   --primary-foreground: #08230f;
@@ -95,8 +111,11 @@
   --accent: #1c1c1e;
   --accent-foreground: #f5f5f7;
   --destructive: #ff453a;
+  --destructive-ink: #ff453a;
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.15);
+  /* 3.4:1 against the field's own fill, 3.9:1 against the card. */
+  --control-border: #76767c;
   --ring: #30d158;
   --chart-1: #30d158;
   --chart-2: #64d2ff;
@@ -110,6 +129,10 @@
 }
 
 @layer base {
+  /* The sticky header is 4rem tall: a focused control scrolled into view must not end up underneath it. */
+  html {
+    scroll-padding-top: 5rem;
+  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -165,6 +188,20 @@
 .glassmorphism {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* Windows High Contrast and other forced-colour modes replace author backgrounds, so a pressed toggle that is shown only
+   by a fill (and a button that has no border) would look like plain text. */
+@media (forced-colors: active) {
+  [data-slot="button"] {
+    border: 1px solid ButtonText;
+  }
+  [aria-pressed="true"] {
+    forced-color-adjust: none;
+    background-color: Highlight;
+    color: HighlightText;
+    border-color: HighlightText;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

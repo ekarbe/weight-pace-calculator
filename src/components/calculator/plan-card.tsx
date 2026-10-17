@@ -19,7 +19,7 @@ interface Props {
 const RISK_CLASS: Record<LossRisk, string> = {
   sustainable: 'font-semibold text-primary-ink',
   brisk: 'font-semibold text-amber-800 dark:text-amber-400',
-  aggressive: 'font-semibold text-destructive',
+  aggressive: 'font-semibold text-destructive-ink',
 };
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -55,11 +55,11 @@ export function PlanCard({ startKg, targetKg, units, targetDate, onDate }: Props
           {rich('plan.sustainable', { amount: w(lostKg), unit: labels.weight, pct: SUSTAINABLE_PCT_PER_WEEK, weeks: plural('plan.weeks', Math.ceil(sustainable.weeks)), date: date(sustainable.date) })}
         </p>
       )}
-      <div className="mt-4 max-w-xs">
+      <div className="mt-4 max-w-xs print:hidden">
         <Label htmlFor={`${id}-date`}>{t('plan.label')}</Label>
         <Input id={`${id}-date`} type="date" min={tomorrow} value={targetDate} onChange={(e) => onDate(e.target.value)} aria-invalid={!!targetDate && !plan} aria-describedby={targetDate && !plan ? `${id}-err` : undefined} />
       </div>
-      {targetDate && !plan && <p id={`${id}-err`} role="alert" className="mt-2 text-sm text-destructive">{t('plan.past')}</p>}
+      {targetDate && !plan && <p id={`${id}-err`} role="alert" className="mt-2 text-sm text-destructive-ink">{t('plan.past')}</p>}
       {plan && (
         <div role="status" className="mt-3 text-sm">
           <p>
