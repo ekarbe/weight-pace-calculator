@@ -30,8 +30,9 @@ type Keys = keyof typeof en;
 
 const de: Record<Keys, string> = {
   'raceResult.source.group': 'Quelle des Schwellentempos',
-  'raceResult.source.threshold': 'Schwellentempo',
-  'raceResult.source.race': 'Aus Wettkampfergebnis',
+  // Soft hyphens (\u00AD): these two labels sit side by side on a 320 px phone and break there instead of mid-word.
+  'raceResult.source.threshold': 'Schwellen\u00ADtempo',
+  'raceResult.source.race': 'Aus Wett\u00ADkampf\u00ADergebnis',
   'raceResult.legend': 'Schwellentempo aus Wettkampfergebnis',
   'raceResult.hint': 'Nimm einen aktuellen Wettkampf, bei dem du alles gegeben hast. Wir rechnen mit demselben Modell rückwärts, das auch deine Wettkampfzeiten schätzt – das Ergebnis ist daher nur ein grober Richtwert.',
   'raceResult.distance.label': 'Wettkampfdistanz',

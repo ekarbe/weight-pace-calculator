@@ -30,7 +30,7 @@ const de: Record<Keys, string> = {
   'shareImage.heading': 'Bild teilen',
   'shareImage.intro': 'Speichere ein Bild deiner geschätzten Rennzeiten, um es aufzubewahren oder zu teilen.',
   'shareImage.weights.label': 'Gewichte im Bild anzeigen',
-  'shareImage.weights.hint': 'Standardmäßig aus: Das Bild zeigt weder Gewicht noch Größe oder Körperfett. Aktiviere die Option, um dein aktuelles Gewicht und dein Zielgewicht hinzuzufügen.',
+  'shareImage.weights.hint': 'Standardmäßig aus: Das Bild zeigt weder Gewicht noch Größe noch Körperfett. Aktiviere die Option, um dein aktuelles Gewicht und dein Zielgewicht hinzuzufügen.',
   'shareImage.save': 'Bild speichern',
   'shareImage.share': 'Teilen…',
   'shareImage.saved': 'Bild gespeichert',

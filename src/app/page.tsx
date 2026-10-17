@@ -117,7 +117,10 @@ export default function HomePage() {
     }
   };
 
-  const customLabel = form.distance ? `${parseFloat(form.distance)} ${form.units === 'metric' ? 'km' : 'mi'}` : '';
+  // Reaches the cards, the chart, the share image and the screen-reader text, so it is formatted for the language like every other number.
+  const customLabel = form.distance
+    ? `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(parseFloat(form.distance))} ${form.units === 'metric' ? 'km' : 'mi'}`
+    : '';
 
   return (
     <div className="flex min-h-screen flex-col">
