@@ -183,8 +183,12 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
 
     const WEIGHT_STEP_KG = 0.5;
     const stepCount = Math.max(0, Math.ceil((startWeight - endWeight) / WEIGHT_STEP_KG - 1e-9));
+    // The table never goes below the entered weight's own row. A runner already at or under the floor gets the one
+    // row for the weight they entered (no change, so the entered pace and its race times come back unchanged), not a
+    // heavier floor row whose "weight lost" would be negative and whose pace would be slower than the one they typed.
+    const lowestWeight = Math.min(endWeight, startWeight);
     for (let step = 0; step <= stepCount; step++) {
-        const targetWeight = Math.max(startWeight - step * WEIGHT_STEP_KG, endWeight);
+        const targetWeight = Math.max(startWeight - step * WEIGHT_STEP_KG, lowestWeight);
         if (lbmKg !== null && targetWeight <= lbmKg) {
             zeroFatWarningHit = true;
             break;
@@ -245,7 +249,7 @@ export function calculateWeightPaceEstimates(input: UserInput): CalculationResul
             paceLimited: paceLimited,
         });
 
-        if (targetWeight <= endWeight) break;
+        if (targetWeight <= lowestWeight) break;
     }
 
     if (unhealthyFatWarningNeeded) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateMinHealthyWeight, calculateWeightPaceEstimates, type UserInput } from './calculations';
+import { calculateMinHealthyWeight, calculateWeightPaceEstimates, estimateRaceTimeSec, type UserInput } from './calculations';
 
 const base: UserInput = {
     gender: 'male',
@@ -70,5 +70,52 @@ describe('calculateWeightPaceEstimates', () => {
     it('warns when already at/below min healthy weight', () => {
         const r = calculateWeightPaceEstimates({ ...base, weightKg: 58 });
         expect(r.warnings.some(w => w.code === 'belowFloor')).toBe(true);
+    });
+    it('gives the entered weight and pace back as row 0, whatever the weight, including under the BMI floor', () => {
+        // 170 cm: the BMI-20 floor is 57.8 kg. Weights on both sides of it, and exactly on it.
+        for (const gender of ['male', 'female'] as const) {
+            for (const weightKg of [41, 50, 53, 56, 57.7, 57.8, 57.9, 58, 60, 70, 95]) {
+                for (const paceFactorSecPerKg of [undefined, 0.5, 2, 4]) {
+                    const input: UserInput = { ...base, gender, heightCm: 170, weightKg, thresholdPaceMin: 5, thresholdPaceSec: 0, paceFactorSecPerKg };
+                    const rows = calculateWeightPaceEstimates(input).resultsTable;
+                    const label = `${gender} ${weightKg} kg factor ${paceFactorSecPerKg}`;
+                    expect(rows[0].targetWeightKg, label).toBe(weightKg);
+                    expect(rows[0].estimatedThresholdPaceSec, label).toBe(300);
+                    expect(rows[0].estimated5kTimeSec, label).toBeCloseTo(estimateRaceTimeSec(300, 5), 9);
+                    // No row is heavier than the entered weight, and the weights never go up.
+                    for (let i = 1; i < rows.length; i++) expect(rows[i].targetWeightKg, label).toBeLessThan(rows[i - 1].targetWeightKg);
+                    expect(Math.max(...rows.map((r) => r.targetWeightKg)), label).toBe(weightKg);
+                }
+            }
+        }
+    });
+    it('has one row for a runner already under the floor, with the warning, and no faster or slower estimate than the entered one', () => {
+        const r = calculateWeightPaceEstimates({ ...base, heightCm: 170, weightKg: 50, thresholdPaceMin: 5, thresholdPaceSec: 0 });
+        expect(r.resultsTable).toHaveLength(1);
+        expect(r.resultsTable[0]).toMatchObject({ targetWeightKg: 50, estimatedThresholdPaceSec: 300, estimated5kTimeSec: 1425 });
+        expect(r.warnings.some((w) => w.code === 'belowFloor')).toBe(true);
+    });
+    it('never makes any row slower than the entered pace (fuzz)', () => {
+        let rand = 12345;
+        const next = () => (rand = (rand * 1103515245 + 12345) % 2147483648) / 2147483648;
+        for (let n = 0; n < 2000; n++) {
+            const input: UserInput = {
+                ...base,
+                gender: next() < 0.5 ? 'male' : 'female',
+                heightCm: 150 + Math.floor(next() * 50),
+                weightKg: 35 + Math.floor(next() * 800) / 10,
+                bmiFloor: next() < 0.5 ? undefined : 18.5 + Math.floor(next() * 23) / 2,
+                thresholdPaceMin: 3 + Math.floor(next() * 5),
+                thresholdPaceSec: Math.floor(next() * 60),
+                paceFactorSecPerKg: next() < 0.5 ? undefined : Math.floor(next() * 8) / 2,
+            };
+            const rows = calculateWeightPaceEstimates(input).resultsTable;
+            const entered = input.thresholdPaceMin * 60 + input.thresholdPaceSec;
+            const cap = input.gender === 'male' ? 160 : 180;
+            expect(rows.length, JSON.stringify(input)).toBeGreaterThan(0);
+            // The first row is the entered weight and pace, unless that pace is itself faster than the model's cap.
+            expect(rows[0].estimatedThresholdPaceSec, JSON.stringify(input)).toBe(Math.max(entered, cap));
+            for (const row of rows) expect(row.estimatedThresholdPaceSec!, JSON.stringify(input)).toBeLessThanOrEqual(Math.max(entered, cap));
+        }
     });
 });

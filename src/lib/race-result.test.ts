@@ -162,6 +162,27 @@ describe('convertRaceDistance', () => {
         expect(convertRaceDistance('5', true)).toBe('3.11');
         expect(convertRaceDistance('26.2', false)).toBe('42.16');
     });
+    it('brings every kilometre value of up to two decimals back unchanged, so a toggle never moves the typed distance or the pace', () => {
+        let checked = 0;
+        for (let hundredths = 100; hundredths <= 10000; hundredths++) {
+            const km = String(hundredths / 100);
+            const miles = convertRaceDistance(km, true);
+            expect(convertRaceDistance(miles, false), `${km} km via ${miles} mi`).toBe(km);
+            checked++;
+        }
+        expect(checked).toBe(9901);
+        // The case from the report: 0.01 mi is 0.016 km, so two decimals in miles cannot hold every two-decimal km value.
+        expect(convertRaceDistance('8.39', true)).toBe('5.213');
+        expect(convertRaceDistance('5.213', false)).toBe('8.39');
+        expect(convertRaceDistance('1.02', true)).not.toBe('0.63');
+    });
+    it('brings every mile value of up to two decimals back unchanged', () => {
+        for (let hundredths = 62; hundredths <= 6213; hundredths++) {
+            const miles = String(hundredths / 100);
+            const km = convertRaceDistance(miles, false);
+            expect(convertRaceDistance(km, true), `${miles} mi via ${km} km`).toBe(miles);
+        }
+    });
     it('leaves empty or unparseable values alone', () => {
         expect(convertRaceDistance('', true)).toBe('');
         expect(convertRaceDistance('abc', false)).toBe('abc');
@@ -187,6 +208,17 @@ describe('buildInput in race mode', () => {
                 const input = buildInput({ ...race5k, units, height: units === 'metric' ? '180' : '70.9', weight: units === 'metric' ? '80' : '176.4', raceDist, raceH, raceM, raceS }, adv).input!;
                 const first = calculateWeightPaceEstimates(input).resultsTable[0];
                 expect(Math.round(first[field]!), `${raceDist} ${units}`).toBe(seconds);
+            }
+        }
+    });
+    it('gives back the entered result in the first row for a runner under the BMI floor too', () => {
+        // 170 cm: the floor is 57.8 kg. 50 kg used to show 26:14 (the time at 57.8 kg) for an entered 25:00.
+        for (const weight of ['41', '50', '56', '57.8', '58', '64']) {
+            for (const units of ['metric', 'imperial'] as const) {
+                const input = buildInput({ ...race5k, units, gender: 'female', height: units === 'metric' ? '170' : '66.9291', weight: units === 'metric' ? weight : String(parseFloat(weight) * 2.2046226218), raceM: '25', raceS: '0' }, adv).input!;
+                const first = calculateWeightPaceEstimates(input).resultsTable[0];
+                expect(Math.round(first.estimated5kTimeSec!), `${weight} kg ${units}`).toBe(1500);
+                expect(first.estimatedThresholdPaceSec, `${weight} kg ${units}`).toBeCloseTo(1500 / 5 / 0.95, 9);
             }
         }
     });

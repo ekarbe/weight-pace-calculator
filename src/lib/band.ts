@@ -73,11 +73,10 @@ function point(main: ResultRow, paceSec: number): BandPoint {
  * (same weights, pace cap per sex) with the band's factors instead of the user's. Per row, and for
  * every metric: conservative time >= main time >= optimistic time, with equality at row 0.
  *
- * The edges are clamped to the main line. That changes nothing in the normal case, but when the entered weight
- * is already below the BMI floor the table's only row is the heavier floor weight, "lost" weight is negative
- * and a larger factor would make the pace slower, not faster. A band that says "might be faster" is
- * meaningless there (and the underweight group is the one the page is most careful with), so such a row gets
- * a zero-width band instead of an inverted one.
+ * The edges are clamped to the main line, so they can never be drawn on the wrong side of it. Row 0 is always the
+ * entered weight (no weight lost, so every factor gives the same pace) and has a zero-width band; that includes a
+ * runner already under the BMI floor, whose single row is their own weight, and the underweight group is the one the
+ * page is most careful with, so no row there ever claims "might be faster".
  */
 export function calculateBand(input: UserInput): Band {
     const userFactor = input.paceFactorSecPerKg ?? DEFAULT_PACE_FACTOR_SEC_PER_KG_PER_KM;

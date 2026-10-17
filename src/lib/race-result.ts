@@ -93,16 +93,24 @@ export function deriveRacePace(form: RaceFormFields): RacePace {
     return out;
 }
 
+/** Miles to a typed-looking km value: snaps to one decimal when that is within the rounding error of a two-decimal mile value (7.46 mi -> 12 km, not 12.01). */
+function milesToKm(miles: number): number {
+    const km = miles * KM_PER_MILE;
+    const oneDecimal = Math.round(km * 10) / 10;
+    return Math.abs(oneDecimal - km) <= 0.005 * KM_PER_MILE ? oneDecimal : Math.round(km * 100) / 100;
+}
+
 /**
  * Converts the custom race distance for the unit toggle, so the derived pace does not drift when toggling
- * back and forth. Miles keep two decimals; kilometres snap to one decimal when that is within the
- * rounding error of a two-decimal mile value (12 km -> 7.46 mi -> 12 km, not 12.01).
+ * back and forth. Miles keep two decimals when those convert back to the typed kilometres (12 km -> 7.46 mi -> 12 km,
+ * not 12.01). A kilometre value typed with two decimals can fall between two-decimal mile values (0.01 mi is 0.016 km),
+ * so it gets a third decimal in miles (8.39 km -> 5.213 mi -> 8.39 km, not 8.38).
  */
 export function convertRaceDistance(value: string, toImperial: boolean): string {
     const n = parseFloat(value);
     if (!isFinite(n)) return value;
-    if (toImperial) return String(Math.round((n / KM_PER_MILE) * 100) / 100);
-    const km = n * KM_PER_MILE;
-    const oneDecimal = Math.round(km * 10) / 10;
-    return String(Math.abs(oneDecimal - km) <= 0.005 * KM_PER_MILE ? oneDecimal : Math.round(km * 100) / 100);
+    if (!toImperial) return String(milesToKm(n));
+    const miles = n / KM_PER_MILE;
+    const twoDecimals = Math.round(miles * 100) / 100;
+    return String(milesToKm(twoDecimals) === n ? twoDecimals : Math.round(miles * 1000) / 1000);
 }
