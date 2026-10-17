@@ -18,7 +18,7 @@ test.describe('chart', () => {
   });
 
   test('below the BMI floor there is no range to draw or announce (it used to read slow to fast, backwards)', async ({ page }) => {
-    // 170 cm at 50 kg is BMI 17.3: the table has one row, the heavier floor weight, and nothing is "lost".
+    // 170 cm at 50 kg is BMI 17.3: the table has one row, the entered weight itself, and nothing is "lost".
     await openApp(page, { params: { g: 'female', h: '170', w: '50', pm: '5', ps: '0' }, results: true });
     await expect(chart(page)).toBeVisible();
     await expect(chart(page)).not.toHaveAttribute('aria-label', /Estimated range/);
@@ -92,7 +92,7 @@ test.describe('chart', () => {
     await expect(chart(page)).not.toHaveAttribute('aria-label', /Estimated range/);
     await expect(disclaimer).toBeVisible();
     // Switching the range off does not hide the saving range on the cards.
-    await expect(page.getByRole('listitem').filter({ hasText: /^10 km:/ })).toContainText('(0:29 to 1:28)');
+    await expect(page.getByRole('listitem').filter({ hasText: /^10 km:/ })).toContainText('Range: 0:29 to 1:28');
 
     await toggle.check();
     await expect(dashed).toHaveCount(2);
@@ -108,11 +108,11 @@ test.describe('chart', () => {
   test('clicking the chart selects a weight', async ({ page }) => {
     await openApp(page, { params: SAMPLE, results: true });
     const { width, height } = (await chart(page).boundingBox())!;
-    // The plot area spans x = 56..624 of the 640-unit-wide viewBox.
-    await chart(page).click({ position: { x: (width * 624) / 640, y: height / 2 } });
+    // One drawing unit is one CSS pixel: the plot area spans x = 56 to (width - 16).
+    await chart(page).click({ position: { x: width - 16, y: height / 2 } });
     await expect(slider(page)).toHaveValue('13');
     await expect(marker(page)).toHaveText('46:58');
-    await chart(page).click({ position: { x: (width * 56) / 640, y: height / 2 } });
+    await chart(page).click({ position: { x: 56, y: height / 2 } });
     await expect(slider(page)).toHaveValue('0');
     await expect(marker(page)).toHaveText('49:00');
   });

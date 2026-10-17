@@ -33,6 +33,7 @@ already have instead of the one Playwright installs (local use only).
 | `smoke`, `shell` | every language renders, language and theme switching, base path, document head |
 | `inputs`, `units`, `slider`, `race-cards`, `chart`, `timeline`, `race-result`, `training`, `warnings` | the features |
 | `share`, `share-image`, `print` | share link round trips, the PNG download and its privacy, print layout and PDF |
+| `controls` | non-text contrast read from real pixels: keyboard focus rings, the edge of text fields and selects, and that an open select list is opaque (`support/pixels.ts` decodes a screenshot in the page) |
 | `a11y`, `a11y-states`, `keyboard`, `responsive`, `touch` | axe scans (4 languages x light/dark at 390px, English at 1280px, and many states), keyboard-only walk, reflow at 320 and 390px, touch input |
 
 ## Speed

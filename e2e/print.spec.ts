@@ -45,6 +45,13 @@ test.describe('print', () => {
     await expect(page.getByRole('heading', { name: 'Share image' })).toBeHidden();
     await expect(page.getByText('Eike Christian Karbe')).toBeHidden();
     await expect(page.getByLabel('Height (cm)')).toBeHidden();
+    // The whole input panel is gone, not only its controls (the style sheet hides inputs, labels and buttons anyway, which would
+    // leave a second, broken "Your stats" card: headings, hints and an empty "Advanced assumptions" box). Only the print-only summary remains.
+    await expect(page.locator('section[aria-labelledby="inputs-heading"]')).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'Your stats' })).toHaveCount(1);
+    await expect(page.getByText('Only used for pace limits and body-fat warnings.')).toBeHidden();
+    await expect(page.getByText('Advanced assumptions')).toBeHidden();
+    await expect(page.getByRole('group', { name: 'Units' })).toBeHidden();
 
     // Kept: the cards, the chart, the timeline, the training card, and the table and notes expanded.
     await expect(page.getByRole('heading', { name: 'Target weight' })).toBeVisible();
@@ -154,6 +161,9 @@ test.describe('print', () => {
     }
     expect(text).toContain('Estimates, not a weight-loss plan.');
     expect(text).toContain('talk to a doctor or dietitian before changing your weight');
+    // One stats summary, not that and the on-screen form's panel as well.
+    expect(text.match(/YOUR STATS/g)).toHaveLength(1);
+    expect(text).not.toContain('Only used for pace limits');
     // Nothing interactive and no query string made it onto paper.
     expect(text).not.toMatch(/Copy share link|Print \/ save as PDF|Save image|Skip to main content/);
     expect(text).not.toMatch(/[?&](lang|g|h|w|bf|pm|ps|d|td|wk|th)=/);

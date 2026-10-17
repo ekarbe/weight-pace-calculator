@@ -146,13 +146,19 @@ test.describe('keyboard only', () => {
     await form(page).sex.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('listbox')).toBeVisible();
+    // The list is visible a moment before the browser has moved the focus into it; an arrow key pressed in between is
+    // swallowed and Enter then picks the first option (Male). Wait for the focus.
+    await expect(page.getByRole('option').first()).toBeFocused();
     await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('option', { name: 'Female' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('listbox')).toBeHidden();
     await expect(form(page).sex).toBeFocused();
     await expect(form(page).sex).toHaveText('Female');
     // Escape closes without changing.
     await page.keyboard.press('Enter');
+    await expect(page.getByRole('listbox')).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Female' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('listbox')).toBeHidden();
     await expect(form(page).sex).toHaveText('Female');

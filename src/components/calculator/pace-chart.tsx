@@ -1,10 +1,11 @@
 'use client';
 
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cn, formatPace, formatTime } from '@/lib/utils';
 import type { ResultRow } from '@/lib/calculations';
 import { estimateRaceTimeSec } from '@/lib/calculations';
 import { BAND_DEFAULT_FACTOR, BAND_LINEAR_LIMIT_KG, bandValue, type Band, type BandPoint } from '@/lib/band';
+import type { TrainingPointer } from '@/lib/training';
 import { kgToLb, secPerKmToSecPerMile, unitLabels, type UnitSystem } from '@/lib/units';
 import { useI18n } from '@/i18n/provider';
 
@@ -18,19 +19,40 @@ interface Props {
   customKm: number | null;
   customLabel: string;
   band: Band | null;
+  /** What the Training context card says about this scenario; where it withholds the estimate the chart draws no range. */
+  trainingPointer?: TrainingPointer;
 }
 
-const W = 640;
-const H = 260;
+/** Width the chart is laid out for before it has been measured. */
+const W_FALLBACK = 640;
 const PAD = { l: 56, r: 16, t: 16, b: 32 };
+/** One drawing unit is one CSS pixel, so the axis labels keep their size at any width (a fixed 640-unit canvas shrank them to 4 px on a phone). */
+const heightFor = (width: number) => Math.min(300, Math.max(200, Math.round(width * 0.45)));
 
-export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, band }: Props) {
+export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, band, trainingPointer = 'none' }: Props) {
   const { t, num, speak } = useI18n();
   const [metric, setMetric] = useState<Metric>('10K');
   const [showRange, setShowRange] = useState(true);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(W_FALLBACK);
+  const W = width;
+  const H = heightFor(width);
   const labels = unitLabels(units);
   const tabsId = useId();
+
+  useLayoutEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = Math.round(el.getBoundingClientRect().width);
+      if (w > 0) setWidth(Math.min(Math.max(w, 240), 1200));
+    };
+    // Measured before the first paint, then followed while the window or the card changes size.
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const active: Metric = metric === 'custom' && customKm === null ? '10K' : metric;
   const options: { key: Metric; label: string }[] = [
@@ -55,8 +77,11 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, 
   };
   const fmt = (v: number) => (active === 'pace' ? formatPace(v) : formatTime(v));
 
-  // No range to draw, switch or announce when the band has no width anywhere (e.g. the entered weight is below the BMI floor).
-  const bandUsable = band !== null && band.rows.length === rows.length && band.rows.some((r) => r.conservative.paceSec !== r.optimistic.paceSec);
+  // No range to draw, switch or announce when the band has no width anywhere (e.g. the entered weight is below the BMI floor),
+  // or where the Training context card says the estimate should not be relied on: the range assumes the healthy case,
+  // and its low end would read as a floor. The race cards leave the range out in the same scenarios.
+  const bandUsable =
+    band !== null && trainingPointer !== 'withheld' && band.rows.length === rows.length && band.rows.some((r) => r.conservative.paceSec !== r.optimistic.paceSec);
   const bandOn = showRange && bandUsable;
   const edge = (p: BandPoint) => {
     const v = bandValue(p, active, customKm);
@@ -77,7 +102,7 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, 
     const ticks = [0, 1, 2, 3].map((k) => lo + ((hi - lo) * k) / 3);
     return { vals, slow, fast, x, y, ticks };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, active, units, customKm, band, bandOn]);
+  }, [rows, active, units, customKm, band, bandOn, W, H]);
 
   const path = geo.vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${geo.x(i).toFixed(1)},${geo.y(v).toFixed(1)}`).join(' ');
   const pts = (vs: number[]) => vs.map((v, i) => `${geo.x(i).toFixed(1)},${geo.y(v).toFixed(1)}`);
@@ -133,7 +158,7 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, 
           {bandOn && (
             <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <li className="flex items-center gap-2">
-                <svg aria-hidden width="28" height="10" className="shrink-0"><line x1="1" x2="27" y1="5" y2="5" stroke="var(--primary)" strokeWidth="3" strokeLinecap="round" /></svg>
+                <svg aria-hidden width="28" height="10" className="shrink-0"><line x1="1" x2="27" y1="5" y2="5" stroke="var(--primary-ink)" strokeWidth="3" strokeLinecap="round" /></svg>
                 {t('band.legend.estimate', { factor: band.factor })}
               </li>
               <li className="flex items-center gap-2">
@@ -182,12 +207,12 @@ export function PaceChart({ rows, index, onIndex, units, customKm, customLabel, 
             <path d={`M${fastPts.join(' L')}`} fill="none" stroke="var(--primary-ink)" strokeWidth="1.5" strokeDasharray="6 4" strokeLinejoin="round" />
           </>
         )}
-        <path d={path} fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={path} fill="none" stroke="var(--primary-ink)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
         <line x1={selX} x2={selX} y1={PAD.t} y2={H - PAD.b} stroke="var(--primary)" strokeOpacity="0.4" strokeDasharray="4 4" />
         {geo.slow && geo.fast && [geo.slow[index], geo.fast[index]].map((v, k) => (
           <circle key={k} cx={selX} cy={geo.y(v)} r="4" fill="var(--background)" stroke="var(--primary-ink)" strokeWidth="2" />
         ))}
-        <circle cx={selX} cy={selY} r="7" fill="var(--background)" stroke="var(--primary)" strokeWidth="3" />
+        <circle cx={selX} cy={selY} r="7" fill="var(--background)" stroke="var(--primary-ink)" strokeWidth="3" />
         <text
           x={Math.min(Math.max(selX, PAD.l + 28), W - PAD.r - 28)}
           y={Math.max(selTop - 14, PAD.t + 10)}
