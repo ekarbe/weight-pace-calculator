@@ -114,6 +114,19 @@ export async function openAllDetails(page: Page) {
   await page.locator('details').evaluateAll((els) => els.forEach((d) => ((d as HTMLDetailsElement).open = true)));
 }
 
+/**
+ * Runs `body` with the system colour scheme emulated as light, then as dark, in the same page. The app follows the
+ * system setting live, so this is one page load for both themes instead of two (where the page was opened in dark
+ * from the start is covered by shell.spec.ts).
+ */
+export async function inEachTheme(page: Page, body: (scheme: 'light' | 'dark') => Promise<void>) {
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await expect(page.locator('html')).toHaveClass(scheme === 'dark' ? /dark/ : /light/);
+    await body(scheme);
+  }
+}
+
 /** Every aria-describedby / aria-labelledby / aria-controls reference on the page points at an element that exists. */
 export async function brokenAriaReferences(page: Page): Promise<string[]> {
   return page.evaluate(() => {

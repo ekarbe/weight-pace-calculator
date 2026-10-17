@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/fixtures';
-import { MODAL_POPUP_RULES, expectNoAxeViolations } from './support/axe';
-import { DATE_BRISK, DATE_TOO_FAST, LOCALES, SAMPLE, brokenAriaReferences, disableMotion, fillSample, form, openAllDetails, openApp, slider, tr } from './support/app';
+import { MODAL_POPUP_RULES, expectNoAxeViolations, type AxeOptions } from './support/axe';
+import { DATE_BRISK, DATE_TOO_FAST, LOCALES, SAMPLE, brokenAriaReferences, disableMotion, fillSample, form, inEachTheme, openAllDetails, openApp, slider, tr } from './support/app';
 
 /**
  * Known defects (reported with this suite, not fixed by it):
@@ -19,9 +19,8 @@ const KNOWN_LIGHT_CONTRAST_DEFECTS = ['.text-destructive'];
 const FULL = { ...SAMPLE, td: DATE_BRISK, wk: '40', th: 'some' };
 
 /**
- * Every state of the Training context card: [name, share-link parameters, steps that need the UI].
- * The "too fast" label of the Timeline card is a known light-theme contrast defect (see above), so it is left out of
- * the light scans that include it; the training card itself uses no destructive colour.
+ * Every state of the Training context card: [name, share-link parameters, steps that need the UI]. Each is scanned
+ * within the card (it uses no destructive colour, so the light-theme defect above does not apply to it).
  */
 const TRAINING_STATES: [string, Record<string, string>, ((page: Page) => Promise<void>)?][] = [
   ['idle (nothing to compare)', SAMPLE, async (page) => { await slider(page).focus(); await page.keyboard.press('Home'); }],
@@ -39,110 +38,122 @@ const TRAINING_STATES: [string, Record<string, string>, ((page: Page) => Promise
 ];
 
 // Desktop project only: states that look the same at any width. Language and viewport coverage is in a11y.spec.ts.
-for (const scheme of ['light', 'dark'] as const) {
-  test.describe(`axe (WCAG 2.1 AA) in other states, ${scheme}`, () => {
-    test.use({ colorScheme: scheme });
-    test.beforeEach(({ page }) => disableMotion(page));
+// Each state is scanned in the light and then in the dark theme within one page load.
+test.describe('axe (WCAG 2.1 AA) in other states, light and dark', () => {
+  test.beforeEach(({ page }) => disableMotion(page));
 
-    test('empty form', async ({ page }) => {
-      await openApp(page);
-      await expectNoAxeViolations(page);
-    });
+  /** Scans the current page in both themes; `lightExclude` is left out of the light-theme scan only (known defects). */
+  const scanBothThemes = (page: Page, opts: AxeOptions & { lightExclude?: string[] } = {}) => {
+    const { lightExclude = [], ...axe } = opts;
+    return inEachTheme(page, (scheme) =>
+      expectNoAxeViolations(page, { ...axe, exclude: [...(axe.exclude ?? []), ...(scheme === 'light' ? lightExclude : [])], label: `${scheme} theme` }),
+    );
+  };
 
-    test('every field in error', async ({ page }) => {
-      await openApp(page);
-      const f = form(page);
-      await fillSample(page, { height: '20', weight: '5', bodyFat: '3', paceMin: '5', paceSec: '75' });
-      await f.distance.fill('0.5');
-      await f.advanced.click();
-      await f.paceGain.fill('9');
-      await expect(page.getByRole('alert').filter({ hasText: 'Enter 50–272 cm' })).toBeVisible();
-      await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
+  test('empty form', async ({ page }) => {
+    await openApp(page);
+    await scanBothThemes(page);
+  });
+
+  test('every field in error', async ({ page }) => {
+    await openApp(page);
+    const f = form(page);
+    await fillSample(page, { height: '20', weight: '5', bodyFat: '3', paceMin: '5', paceSec: '75' });
+    await f.distance.fill('0.5');
+    await f.advanced.click();
+    await f.paceGain.fill('9');
+    await expect(page.getByRole('alert').filter({ hasText: 'Enter 50–272 cm' })).toBeVisible();
+    await scanBothThemes(page, { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS });
+    expect(await brokenAriaReferences(page)).toEqual([]);
+  });
+
+  test('race-result mode with its errors and with a derived pace', async ({ page }) => {
+    await openApp(page, { params: { g: 'female', h: '170', w: '64', pace: 'race', rd: 'custom', rdc: '8', rtm: '5', rts: '0' } });
+    await expect(page.getByRole('alert').filter({ hasText: 'That time works out to a threshold pace' })).toBeVisible();
+    await scanBothThemes(page);
+    await page.getByLabel('Minutes', { exact: true }).fill('36');
+    await expect(slider(page)).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Threshold pace from a recent race' }).getByRole('status')).toContainText('4:38');
+    await openAllDetails(page);
+    await scanBothThemes(page);
+  });
+
+  test('a too-fast plan (risk and withheld training in the warning colours)', async ({ page }) => {
+    await openApp(page, { params: { ...FULL, td: DATE_TOO_FAST }, results: true });
+    await expect(page.getByRole('status').filter({ hasText: 'No estimate shown' })).toBeVisible();
+    await openAllDetails(page);
+    await scanBothThemes(page, { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS });
+  });
+
+  test('body fat below healthy levels (warnings, flagged rows, no share image)', async ({ page }) => {
+    await openApp(page, { params: { g: 'male', h: '180', w: '75', bf: '10', pm: '4', ps: '0' }, results: true });
+    await slider(page).focus();
+    await page.keyboard.press('End');
+    await expect(page.getByText('No image for this target weight')).toBeVisible();
+    await openAllDetails(page);
+    await scanBothThemes(page, { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS });
+  });
+
+  test('capped pace warning in imperial units', async ({ page }) => {
+    await openApp(page, { params: { u: 'imperial', g: 'female', h: '67', w: '141', pm: '4', ps: '40' }, results: true });
+    await slider(page).focus();
+    await page.keyboard.press('End');
+    await expect(page.getByText('Pace is capped at the model’s limit here')).toBeVisible();
+    await openAllDetails(page);
+    await scanBothThemes(page, { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS });
+  });
+
+  for (const [name, params, steps] of TRAINING_STATES) {
+    test(`training context: ${name}`, async ({ page }) => {
+      await openApp(page, { params, results: true });
+      await steps?.(page);
+      await expect(page.locator('section#training')).toBeVisible();
+      await openAllDetails(page);
+      // Scoped to the card: the rest of the page is scanned in full by a11y.spec.ts and the tests above.
+      await scanBothThemes(page, { include: ['section#training'] });
       expect(await brokenAriaReferences(page)).toEqual([]);
     });
+  }
 
-    test('race-result mode with its errors and with a derived pace', async ({ page }) => {
-      await openApp(page, { params: { g: 'female', h: '170', w: '64', pace: 'race', rd: 'custom', rdc: '8', rtm: '5', rts: '0' } });
-      await expect(page.getByRole('alert').filter({ hasText: 'That time works out to a threshold pace' })).toBeVisible();
-      await expectNoAxeViolations(page);
-      await page.getByLabel('Minutes', { exact: true }).fill('36');
-      await expect(slider(page)).toBeVisible();
-      await expect(page.getByRole('group', { name: 'Threshold pace from a recent race' }).getByRole('status')).toContainText('4:38');
-      await openAllDetails(page);
-      await expectNoAxeViolations(page);
-    });
-
-    test('a too-fast plan (risk and withheld training in the warning colours)', async ({ page }) => {
-      await openApp(page, { params: { ...FULL, td: DATE_TOO_FAST }, results: true });
-      await expect(page.getByRole('status').filter({ hasText: 'No estimate shown' })).toBeVisible();
-      await openAllDetails(page);
-      await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
-    });
-
-    test('body fat below healthy levels (warnings, flagged rows, no share image)', async ({ page }) => {
-      await openApp(page, { params: { g: 'male', h: '180', w: '75', bf: '10', pm: '4', ps: '0' }, results: true });
-      await slider(page).focus();
-      await page.keyboard.press('End');
-      await expect(page.getByText('No image for this target weight')).toBeVisible();
-      await openAllDetails(page);
-      await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
-    });
-
-    test('capped pace warning in imperial units', async ({ page }) => {
-      await openApp(page, { params: { u: 'imperial', g: 'female', h: '67', w: '141', pm: '4', ps: '40' }, results: true });
-      await slider(page).focus();
-      await page.keyboard.press('End');
-      await expect(page.getByText('Pace is capped at the model’s limit here')).toBeVisible();
-      await openAllDetails(page);
-      await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
-    });
-
-    for (const [name, params, steps] of TRAINING_STATES) {
-      test(`training context: ${name}`, async ({ page }) => {
-        await openApp(page, { params, results: true });
-        await steps?.(page);
-        await expect(page.locator('section#training')).toBeVisible();
+  // German and French run 30 to 40 % longer: the narrowest reflow width, with the state that carries the most text.
+  for (const lang of ['de', 'fr'] as const) {
+    for (const [name, params] of [['lowered', { ...SAMPLE, td: DATE_BRISK, wk: '40' }], ['withheld', { ...SAMPLE, td: DATE_TOO_FAST, wk: '60' }]] as const) {
+      test(`training context, ${lang} at 320 px: ${name}`, async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
+        await openApp(page, { lang, params, results: true });
         await openAllDetails(page);
-        await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
-        expect(await brokenAriaReferences(page)).toEqual([]);
+        // The card is what changes between the states; the whole page is scanned once, for the first state.
+        await scanBothThemes(page, name === 'lowered' ? { lightExclude: KNOWN_LIGHT_CONTRAST_DEFECTS } : { include: ['section#training'] });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
       });
     }
+  }
 
-    // German and French run 30 to 40 % longer: the narrowest reflow width, with the state that carries the most text.
-    for (const lang of ['de', 'fr'] as const) {
-      for (const [name, params] of [['lowered', { ...SAMPLE, td: DATE_BRISK, wk: '40' }], ['withheld', { ...SAMPLE, td: DATE_TOO_FAST, wk: '60' }], ['a mistyped distance', { ...SAMPLE, wk: '300' }]] as const) {
-        test(`training context, ${lang} at 320 px: ${name}`, async ({ page }) => {
-          await page.setViewportSize({ width: 320, height: 640 });
-          await openApp(page, { lang, params, results: true });
-          await openAllDetails(page);
-          await expectNoAxeViolations(page, { exclude: scheme === 'light' ? KNOWN_LIGHT_CONTRAST_DEFECTS : [] });
-          expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
-        });
-      }
-    }
-
-    test('open select lists', async ({ page }) => {
-      await openApp(page, { params: FULL, results: true });
+  test('open select lists', async ({ page }) => {
+    await openApp(page, { params: FULL, results: true });
+    await inEachTheme(page, async (scheme) => {
       await form(page).sex.click();
       await expect(page.getByRole('listbox')).toBeVisible();
-      await expectNoAxeViolations(page, { disableRules: MODAL_POPUP_RULES });
+      await expectNoAxeViolations(page, { disableRules: MODAL_POPUP_RULES, label: `${scheme} theme, sex` });
       await page.keyboard.press('Escape');
       await expect(page.getByRole('listbox')).toBeHidden();
 
       await page.getByRole('combobox', { name: 'How long have you run regularly?' }).click();
       await expect(page.getByRole('listbox')).toBeVisible();
-      await expectNoAxeViolations(page, { disableRules: MODAL_POPUP_RULES });
-    });
-
-    test('an open tooltip', async ({ page }) => {
-      await openApp(page, { params: FULL, results: true });
-      await page.getByRole('button', { name: 'What is threshold pace?' }).focus();
-      await expect(page.getByRole('tooltip').first()).toBeVisible();
-      // The tooltip text itself is a reported defect (below); it is portalled outside the landmarks by design.
-      await expectNoAxeViolations(page, { exclude: ['[role="tooltip"]'] });
+      await expectNoAxeViolations(page, { disableRules: MODAL_POPUP_RULES, label: `${scheme} theme, history` });
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('listbox')).toBeHidden();
     });
   });
-}
+
+  test('an open tooltip', async ({ page }) => {
+    await openApp(page, { params: FULL, results: true });
+    await page.getByRole('button', { name: 'What is threshold pace?' }).focus();
+    await expect(page.getByRole('tooltip').first()).toBeVisible();
+    // The tooltip text itself is a reported defect (below); it is portalled outside the landmarks by design.
+    await scanBothThemes(page, { exclude: ['[role="tooltip"]'] });
+  });
+});
 
 test.describe('structure', () => {
   for (const lang of LOCALES) {

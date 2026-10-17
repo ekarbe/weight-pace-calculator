@@ -33,7 +33,19 @@ already have instead of the one Playwright installs (local use only).
 | `smoke`, `shell` | every language renders, language and theme switching, base path, document head |
 | `inputs`, `units`, `slider`, `race-cards`, `chart`, `timeline`, `race-result`, `training`, `warnings` | the features |
 | `share`, `share-image`, `print` | share link round trips, the PNG download and its privacy, print layout and PDF |
-| `a11y`, `a11y-states`, `keyboard`, `responsive` | axe scans (4 languages x light/dark x desktop/mobile and many states), keyboard-only walk, reflow at 320 and 390px |
+| `a11y`, `a11y-states`, `keyboard`, `responsive`, `touch` | axe scans (4 languages x light/dark at 390px, English at 1280px, and many states), keyboard-only walk, reflow at 320 and 390px, touch input |
+
+## Speed
+
+The suite is CPU-bound (software-rendered Chromium), so its run time is the number of page loads and axe scans. About
+2 minutes on 4 vCPUs. To keep it there:
+
+- Where a test checks both themes it loads the page once and flips the emulated colour scheme (`inEachTheme`); opening
+  the page in dark from the start is covered in `shell.spec.ts`.
+- Tests are routed to projects instead of running everywhere: the four-language axe matrix (`@other-languages`) and the
+  320px reflow checks (`@phone`) run in the phone project only, touch tests (`touch.spec.ts`) only there too.
+- Scans of one card (the Training context states) are scoped to it with `include`; the full page is scanned by
+  `a11y.spec.ts`.
 
 ## Accessibility scans
 

@@ -57,6 +57,10 @@ export default defineConfig({
     {
       name: 'desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } },
+      testIgnore: ['touch.spec.ts'],
+      // The four-language axe matrix and the 320px reflow checks run in the phone project; at 1280px English is enough
+      // (the layout does not depend on the language).
+      grepInvert: /@other-languages|@phone/,
     },
     {
       // A 390px-wide phone, the width the app is designed and audited for.
@@ -68,7 +72,7 @@ export default defineConfig({
         isMobile: true,
         hasTouch: true,
       },
-      testMatch: ['smoke.spec.ts', 'a11y.spec.ts', 'responsive.spec.ts'],
+      testMatch: ['smoke.spec.ts', 'a11y.spec.ts', 'responsive.spec.ts', 'touch.spec.ts'],
     },
   ],
   webServer: {

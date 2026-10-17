@@ -14,6 +14,8 @@ export interface AxeOptions {
   disableRules?: string[];
   /** Run only these rules (still within the WCAG tag set). */
   rules?: string[];
+  /** Shown in the failure message, e.g. the theme the scan ran in. */
+  label?: string;
 }
 
 /**
@@ -43,7 +45,7 @@ async function scan(page: Page, opts: AxeOptions): Promise<string[]> {
 }
 
 export async function expectNoAxeViolations(page: Page, opts: AxeOptions = {}) {
-  expect(await axeViolations(page, opts), 'axe violations').toEqual([]);
+  expect(await axeViolations(page, opts), opts.label ? `axe violations (${opts.label})` : 'axe violations').toEqual([]);
 }
 
 /**

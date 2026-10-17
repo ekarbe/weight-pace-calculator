@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/fixtures';
-import { DATE_BRISK, LOCALES, SAMPLE, hasHorizontalOverflow, openAllDetails, openApp, slider, tr } from './support/app';
+import { DATE_BRISK, LOCALES, SAMPLE, hasHorizontalOverflow, openAllDetails, openApp, tr } from './support/app';
 
 const FULL = { ...SAMPLE, td: DATE_BRISK, wk: '40', th: 'some' };
 
@@ -50,7 +50,8 @@ test.describe('layout at every width', () => {
   });
 });
 
-test.describe('narrow screens (WCAG 1.4.10 reflow, 320 CSS px)', () => {
+// Phone project only (a 320px viewport is a phone; see playwright.config.ts).
+test.describe('narrow screens (WCAG 1.4.10 reflow, 320 CSS px)', { tag: '@phone' }, () => {
   test.use({ viewport: { width: 320, height: 640 } });
   for (const lang of LOCALES) {
     test(`${lang}: content reflows into one column without horizontal scrolling`, async ({ page }) => {
@@ -63,36 +64,11 @@ test.describe('narrow screens (WCAG 1.4.10 reflow, 320 CSS px)', () => {
 });
 
 test.describe('touch', () => {
-  test('tapping the chart selects a weight', async ({ page, hasTouch }) => {
-    test.skip(!hasTouch, 'touch screens only');
-    await openApp(page, { params: SAMPLE, results: true });
-    const chart = page.getByRole('img', { name: /^Line chart/ });
-    const { width, height } = (await chart.boundingBox())!;
-    await chart.tap({ position: { x: (width * 624) / 640, y: height / 2 } });
-    await expect(slider(page)).toHaveValue('13');
-    await chart.tap({ position: { x: (width * 56) / 640, y: height / 2 } });
-    await expect(slider(page)).toHaveValue('0');
-  });
-
+  // The touch-only tests (tapping the chart, touch target sizes) are in touch.spec.ts.
   test('the form fields bring up numeric keyboards', async ({ page }) => {
     await openApp(page);
     await expect(page.getByLabel(/^Height/)).toHaveAttribute('inputmode', 'decimal');
     await expect(page.getByLabel('Threshold pace, minutes')).toHaveAttribute('inputmode', 'numeric');
     await expect(page.getByLabel(/^Custom race distance/)).toHaveAttribute('inputmode', 'decimal');
   });
-
-  test('the training fields are touch-sized and keep the numeric keyboard', async ({ page, hasTouch }) => {
-    test.skip(!hasTouch, 'touch screens only');
-    await openApp(page, { params: SAMPLE, results: true });
-    const km = page.getByLabel(/^Running per week/);
-    const since = page.getByRole('combobox', { name: 'How long have you run regularly?' });
-    await expect(km).toHaveAttribute('inputmode', 'decimal');
-    for (const field of [km, since]) {
-      await field.scrollIntoViewIfNeeded();
-      expect((await field.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-      // 16 px stops mobile browsers from zooming the page when the field is focused.
-      expect(parseFloat(await field.evaluate((el) => getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
-    }
-  });
 });
-
